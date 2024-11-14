@@ -20,8 +20,6 @@ class RewardStruct:
         self.weight = m_weight
         self.min_value = -1
         self.is_first_arrive_center = True
-        self.last_hit_threshold = 50  # 小兵“最后一击”的生命值阈值
-        self.last_hit_reward = 5      # 完成最后一击的奖励值
 
 
 # Used to initialize various reward information
@@ -34,8 +32,6 @@ def init_calc_frame_map():
 
 
 class GameRewardManager:
-
-    # 初始化的的值
     def __init__(self, main_hero_runtime_id):
         self.main_hero_player_id = main_hero_runtime_id
         self.main_hero_camp = -1
@@ -70,20 +66,14 @@ class GameRewardManager:
         self.m_each_level_max_exp[13] = 1778
         self.m_each_level_max_exp[14] = 1984
 
-    # 计算当前帧的数据并返回对应的奖励值
     def result(self, frame_data):
-        # 初始化英雄的最大经验值 调用init_max_exp_of_each_hero(self)函数
-        self.init_max_exp_of_each_hero() 
-        # 处理帧数据
+        self.init_max_exp_of_each_hero()
         self.frame_data_process(frame_data)
-        # 计算奖励
         self.get_reward(frame_data, self.m_reward_value)
 
-        # 当前帧编号
         frame_no = frame_data["frameNo"]
         if self.time_scale_arg > 0:
             for key in self.m_reward_value:
-                # 计算奖励值衰退
                 self.m_reward_value[key] *= math.pow(0.6, 1.0 * frame_no / self.time_scale_arg)
 
         return self.m_reward_value
@@ -102,19 +92,9 @@ class GameRewardManager:
                 main_hero = hero
             else:
                 enemy_hero = hero
-        
-        # 获取智能体位置
-        sight_area = hero["actor_state"]["sight_area"]
-        hero_x = main_hero["actor_state"]["location"]["x"]
-        hero_z = main_hero["actor_state"]["location"]["z"]
-
-        # 主英雄当前生命值
         main_hero_hp = main_hero["actor_state"]["hp"]
-        # 主英雄最大生命值
         main_hero_max_hp = main_hero["actor_state"]["max_hp"]
-        # 主英雄当前法力值
         main_hero_ep = main_hero["actor_state"]["values"]["ep"]
-        # 主英雄最大法力值
         main_hero_max_ep = main_hero["actor_state"]["values"]["max_ep"]
 
         # Get both defense towers
@@ -125,17 +105,16 @@ class GameRewardManager:
             organ_camp = organ["camp"]
             organ_subtype = organ["sub_type"]
             if organ_camp == camp:
-                if organ_subtype == "ACTOR_SUB_TOWER":  # 21 我方的塔
+                if organ_subtype == "ACTOR_SUB_TOWER":  # 21 is ACTOR_SUB_TOWER, normal tower
                     main_tower = organ
-                elif organ_subtype == "ACTOR_SUB_CRYSTAL":  # 24 我方的水晶
+                elif organ_subtype == "ACTOR_SUB_CRYSTAL":  # 24 is ACTOR_SUB_CRYSTAL, base crystal
                     main_spring = organ
             else:
-                if organ_subtype == "ACTOR_SUB_TOWER":  # 21 敌方的塔
+                if organ_subtype == "ACTOR_SUB_TOWER":  # 21 is ACTOR_SUB_TOWER, normal tower
                     enemy_tower = organ
-                elif organ_subtype == "ACTOR_SUB_CRYSTAL":  # 24 敌方的水晶
+                elif organ_subtype == "ACTOR_SUB_CRYSTAL":  # 24 is ACTOR_SUB_CRYSTAL, base crystal
                     enemy_spring = organ
 
-        # 计算各个奖励项的值
         for reward_name, reward_struct in cul_calc_frame_map.items():
             reward_struct.last_frame_value = reward_struct.cur_frame_value
             # Money
@@ -170,30 +149,19 @@ class GameRewardManager:
             elif reward_name == "last_hit":
                 reward_struct.cur_frame_value = 0.0
                 frame_action = frame_data["frame_action"]
-
                 if "dead_action" in frame_action:
                     dead_actions = frame_action["dead_action"]
                     for dead_action in dead_actions:
-                        # 获取小兵位置
-                        minion_x = dead_action["death"]["location"]["x"]
-                        minion_z = dead_action["death"]["location"]["z"]
-                        distance_to_minion = math.sqrt((minion_x - hero_x) ** 2 + (minion_z - hero_z) ** 2)
-
-                        # 检查主智能体是否完成了最后一击
-                        if (distance_to_minion <= sight_area and
-                            dead_action["killer"]["runtime_id"] == main_hero["actor_state"]["runtime_id"] and
-                            dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER" and
-                            dead_action["death"]["hp"] < self.last_hit_threshold):
-                            # 如果条件满足，给予“最后一击”奖励
-                            reward_struct.cur_frame_value += self.last_hit_reward
-
-                        # 这个非必要，出现这个的想法主要是防止对方拿更多的钱
-                        # # 检查敌方英雄是否完成了小兵的最后一击
-                        # elif (dead_action["killer"]["runtime_id"] == enemy_hero["actor_state"]["runtime_id"] and
-                        #       dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER"):
-                        #     # 敌方完成最后一击，给负向奖励
-                        #     reward_struct.cur_frame_value -= 1.0
-
+                        if (
+                            dead_action["killer"]["runtime_id"] == main_hero["actor_state"]["runtime_id"]
+                            and dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER"
+                        ):
+                            reward_struct.cur_frame_value += 1.0
+                        elif (
+                            dead_action["killer"]["runtime_id"] == enemy_hero["actor_state"]["runtime_id"]
+                            and dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER"
+                        ):
+                            reward_struct.cur_frame_value -= 1.0
             # Experience points
             # 经验值
             elif reward_name == "exp":
@@ -202,6 +170,9 @@ class GameRewardManager:
             # 前进
             elif reward_name == "forward":
                 reward_struct.cur_frame_value = self.calculate_forward(main_hero, main_tower, enemy_tower)
+             # 视野和攻击范围奖励
+            elif reward_name == "sight_attack_reward":
+                reward_struct.cur_frame_value = self.calculate_sight_attack_reward(main_hero)
 
     # Calculate the total amount of experience gained using agent level and current experience value
     # 用智能体等级和当前经验值，计算获得经验值的总量
@@ -227,7 +198,28 @@ class GameRewardManager:
         if main_hero["actor_state"]["hp"] / main_hero["actor_state"]["max_hp"] > 0.99 and dist_hero2emy > dist_main2emy:
             forward_value = (dist_main2emy - dist_hero2emy) / dist_main2emy
         return forward_value
-
+    
+    # Calculate the sight and attack range reward
+    # 计算视野和攻击范围奖励
+    def calculate_sight_attack_reward(self, main_hero):
+        reward = 0
+        # 假设英雄视野内有敌人（camp_visible[1] 表示敌方可见），增加奖励
+        if main_hero["actor_state"]["camp_visible"][1]:
+            reward += 0.2  # 视野范围内有敌人奖励值，可调整
+        # 如果敌人在攻击范围内，则进一步增加奖励
+        if main_hero["actor_state"]["attack_range"] >= self.distance_to_target(main_hero):
+            reward += 0.5  # 攻击范围内敌人奖励值，可调整
+        return reward
+    
+    def distance_to_target(self, main_hero):
+        # 计算英雄到攻击目标的距离
+        target_location = main_hero["actor_state"]["location"]  # 目标位置
+        hero_location = main_hero["actor_state"]["location"]
+        return math.sqrt(
+            (hero_location["x"] - target_location["x"]) ** 2 +
+            (hero_location["z"] - target_location["z"]) ** 2
+        )
+    
     # Calculate the reward item information for both sides using frame data
     # 用帧数据来计算两边的奖励子项信息
     def frame_data_process(self, frame_data):

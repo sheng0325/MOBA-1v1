@@ -31,7 +31,6 @@ from ppo.config import Config
 from kaiwu_agent.utils.common_func import attached
 from ppo.feature.reward_manager import GameRewardManager
 
-
 @attached
 class Agent(BaseAgent):
     def __init__(self, agent_type="player", device=None, logger=None, monitor=None):
@@ -71,6 +70,24 @@ class Agent(BaseAgent):
 
         super().__init__(agent_type, device, logger, monitor)
 
+    
+    def _extract_observation_features(self, feature):
+        """
+        提取主要的观测特征：主英雄状态、敌方英雄状态和小兵状态。
+        
+        参数:
+            feature: 整体观测特征向量
+        
+        返回:
+            main_hero_state: 主英雄状态特征 (102 维)
+            enemy_hero_state: 敌方英雄状态特征 (102 维)
+            main_camp_soldier_features: 我方第一个小兵的特征 (18 维)
+        """
+        main_hero_state = feature[:102]  # 主英雄状态的特征从第一个元素开始，共102个元素
+        enemy_hero_state = feature[102:204]  # 敌方英雄状态特征，紧接在主英雄状态后面，也为102个元素
+        main_camp_soldier_features = feature[387:405]  # 小兵的状态特征在更后面的位置，我们仅使用第一个小兵的特征
+        return main_hero_state, enemy_hero_state, main_camp_soldier_features
+    
     def _model_inference(self, list_obs_data):
         # 使用网络进行推理
         # Using the network for inference
