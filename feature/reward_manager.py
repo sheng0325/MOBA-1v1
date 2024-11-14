@@ -20,6 +20,9 @@ class RewardStruct:
         self.weight = m_weight
         self.min_value = -1
         self.is_first_arrive_center = True
+        self.last_hit_threshold = 50  # 小兵“最后一击”的生命值阈值
+        self.last_hit_reward = 5      # 完成最后一击的奖励值
+        self.vision_radius = 500      # 假设视野半径为500
 
 
 # Used to initialize various reward information
@@ -100,6 +103,10 @@ class GameRewardManager:
                 main_hero = hero
             else:
                 enemy_hero = hero
+        
+        # 获取智能体位置
+        hero_x = main_hero["actor_state"]["location"]["x"]
+        hero_z = main_hero["actor_state"]["location"]["z"]
 
         # 主英雄当前生命值
         main_hero_hp = main_hero["actor_state"]["hp"]
@@ -163,19 +170,30 @@ class GameRewardManager:
             elif reward_name == "last_hit":
                 reward_struct.cur_frame_value = 0.0
                 frame_action = frame_data["frame_action"]
+
                 if "dead_action" in frame_action:
                     dead_actions = frame_action["dead_action"]
                     for dead_action in dead_actions:
-                        if (
-                            dead_action["killer"]["runtime_id"] == main_hero["actor_state"]["runtime_id"]
-                            and dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER"
-                        ):
-                            reward_struct.cur_frame_value += 1.0
-                        elif (
-                            dead_action["killer"]["runtime_id"] == enemy_hero["actor_state"]["runtime_id"]
-                            and dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER"
-                        ):
-                            reward_struct.cur_frame_value -= 1.0
+                        # 获取小兵位置
+                        minion_x = dead_action["death"]["location"]["x"]
+                        minion_z = dead_action["death"]["location"]["z"]
+                        distance = math.sqrt((minion_x - hero_x) ** 2 + (minion_z - hero_z) ** 2)
+
+                        # 检查主智能体是否完成了最后一击
+                        if (distance <= self.vision_radius and
+                            dead_action["killer"]["runtime_id"] == main_hero["actor_state"]["runtime_id"] and
+                            dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER" and
+                            dead_action["death"]["hp"] < self.last_hit_threshold):
+                            # 如果条件满足，给予“最后一击”奖励
+                            reward_struct.cur_frame_value += self.last_hit_reward
+
+                        # 这个非必要，出现这个的想法主要是防止对方拿更多的钱
+                        # # 检查敌方英雄是否完成了小兵的最后一击
+                        # elif (dead_action["killer"]["runtime_id"] == enemy_hero["actor_state"]["runtime_id"] and
+                        #       dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER"):
+                        #     # 敌方完成最后一击，给负向奖励
+                        #     reward_struct.cur_frame_value -= 1.0
+
             # Experience points
             # 经验值
             elif reward_name == "exp":
