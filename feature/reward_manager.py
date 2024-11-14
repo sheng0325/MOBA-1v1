@@ -22,7 +22,6 @@ class RewardStruct:
         self.is_first_arrive_center = True
         self.last_hit_threshold = 50  # 小兵“最后一击”的生命值阈值
         self.last_hit_reward = 5      # 完成最后一击的奖励值
-        self.vision_radius = 500      # 假设视野半径为500
 
 
 # Used to initialize various reward information
@@ -105,6 +104,7 @@ class GameRewardManager:
                 enemy_hero = hero
         
         # 获取智能体位置
+        sight_area = hero["actor_state"]["sight_area"]
         hero_x = main_hero["actor_state"]["location"]["x"]
         hero_z = main_hero["actor_state"]["location"]["z"]
 
@@ -177,10 +177,10 @@ class GameRewardManager:
                         # 获取小兵位置
                         minion_x = dead_action["death"]["location"]["x"]
                         minion_z = dead_action["death"]["location"]["z"]
-                        distance = math.sqrt((minion_x - hero_x) ** 2 + (minion_z - hero_z) ** 2)
+                        distance_to_minion = math.sqrt((minion_x - hero_x) ** 2 + (minion_z - hero_z) ** 2)
 
                         # 检查主智能体是否完成了最后一击
-                        if (distance <= self.vision_radius and
+                        if (distance_to_minion <= sight_area and
                             dead_action["killer"]["runtime_id"] == main_hero["actor_state"]["runtime_id"] and
                             dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER" and
                             dead_action["death"]["hp"] < self.last_hit_threshold):
