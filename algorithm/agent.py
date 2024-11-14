@@ -9,6 +9,7 @@ Author: Tencent AI Arena Authors
 
 
 import torch
+import math
 
 torch.set_num_threads(1)
 torch.set_num_interop_threads(1)
@@ -105,6 +106,7 @@ class Agent(BaseAgent):
         _lstm_hidden = _lstm_hidden.squeeze(axis=0)
 
         list_act_data = list()
+        
         for i in range(len(legal_action)):
             prob, action, d_action = self._sample_masked_action(logits[i], legal_action[i])
             list_act_data.append(
