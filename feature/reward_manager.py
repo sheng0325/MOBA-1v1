@@ -170,9 +170,6 @@ class GameRewardManager:
             # 前进
             elif reward_name == "forward":
                 reward_struct.cur_frame_value = self.calculate_forward(main_hero, main_tower, enemy_tower)
-             # 视野和攻击范围奖励
-            elif reward_name == "sight_attack_reward":
-                reward_struct.cur_frame_value = self.calculate_sight_attack_reward(main_hero)
 
     # Calculate the total amount of experience gained using agent level and current experience value
     # 用智能体等级和当前经验值，计算获得经验值的总量
@@ -198,28 +195,7 @@ class GameRewardManager:
         if main_hero["actor_state"]["hp"] / main_hero["actor_state"]["max_hp"] > 0.99 and dist_hero2emy > dist_main2emy:
             forward_value = (dist_main2emy - dist_hero2emy) / dist_main2emy
         return forward_value
-    
-    # Calculate the sight and attack range reward
-    # 计算视野和攻击范围奖励
-    def calculate_sight_attack_reward(self, main_hero):
-        reward = 0
-        # 假设英雄视野内有敌人（camp_visible[1] 表示敌方可见），增加奖励
-        if main_hero["actor_state"]["camp_visible"][1]:
-            reward += 0.2  # 视野范围内有敌人奖励值，可调整
-        # 如果敌人在攻击范围内，则进一步增加奖励
-        if main_hero["actor_state"]["attack_range"] >= self.distance_to_target(main_hero):
-            reward += 0.5  # 攻击范围内敌人奖励值，可调整
-        return reward
-    
-    def distance_to_target(self, main_hero):
-        # 计算英雄到攻击目标的距离
-        target_location = main_hero["actor_state"]["location"]  # 目标位置
-        hero_location = main_hero["actor_state"]["location"]
-        return math.sqrt(
-            (hero_location["x"] - target_location["x"]) ** 2 +
-            (hero_location["z"] - target_location["z"]) ** 2
-        )
-    
+
     # Calculate the reward item information for both sides using frame data
     # 用帧数据来计算两边的奖励子项信息
     def frame_data_process(self, frame_data):

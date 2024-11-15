@@ -39,7 +39,7 @@ class GameConfig:
         "ep_rate": 0.75,
         "death": -1.0,
         "kill": -0.6,
-        "last_hit": 0.5,
+        "last_hit": 0.6,
         "forward": 0.01,
         "sight_attack_reward": 1.0,  # 新增视野和攻击范围奖励项的权重
     }
