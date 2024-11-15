@@ -41,7 +41,8 @@ class GameConfig:
         "kill": -0.6,
         "last_hit": 0.6,
         "forward": 0.01,
-        "attack_enemy_hero": 5.0,  # 根据需要调整权重
+        "attack_enemy_hero": 1.0,  # 根据需要调整权重
+        "pick_health_pack": 3.0,  # 根据需要调整权重
     }
     # Time decay factor, used in reward_manager
     # 时间衰减因子，在reward_manager中使用
