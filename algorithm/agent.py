@@ -9,6 +9,7 @@ Author: Tencent AI Arena Authors
 
 
 import torch
+import json
 
 torch.set_num_threads(1)
 torch.set_num_interop_threads(1)
@@ -158,8 +159,36 @@ class Agent(BaseAgent):
         # 调用agent.predict，执行分布式模型推理
         act_data = self.predict([obs_data])[0]
         self.update_status(obs_data, act_data)
-        return self.action_process(state_dict, act_data, False)
 
+        # 新增策略逻辑
+        player_id = state_dict["player_id"]
+        player_hero, enemy_heroes, minions = parse_frame_state(state_dict, player_id)
+
+        # 打印所有小兵数据
+        print_all_minions(minions)
+
+        # 决策行动
+        target_minion = decide_action(player_hero, enemy_heroes, minions)
+        if target_minion:
+            # 构建攻击指令
+            action = self.build_attack_action(target_minion)
+        else:
+            # 使用原有的行动
+            action = self.action_process(state_dict, act_data, False)
+
+        return action
+    
+    def build_attack_action(self, target_minion):
+        # 根据具体的环境和动作空间，构建攻击指令
+        # 这里需要根据您的动作定义来构建
+        # 例如，假设动作是一个数组，包含动作类型和目标ID
+
+        minion_id = target_minion["actor_state"]["runtime_id"]
+        # 构建攻击小兵的动作，例如 [动作类型, 目标ID]
+        attack_action = [1, minion_id]  # 具体取决于动作空间的定义
+
+        return attack_action
+    
     def action_process(self, state_dict, act_data, is_stochastic):
         if is_stochastic:
             # Use stochastic sampling action
@@ -178,6 +207,80 @@ class Agent(BaseAgent):
         return ObsData(
             feature=feature_vec, legal_action=legal_action, lstm_cell=self.lstm_cell, lstm_hidden=self.lstm_hidden
         )
+    
+    def parse_frame_state(state_dict, player_id):
+        frame_state = state_dict["frame_state"]
+        hero_states = frame_state["hero_states"]
+        npc_states = frame_state["npc_states"]
+        player_hero = None
+        enemy_heroes = []
+        minions = []
+
+        # 提取英雄信息
+        for hero in hero_states:
+            if hero["player_id"] == player_id:
+                player_hero = hero
+            else:
+                enemy_heroes.append(hero)
+
+        # 提取小兵信息
+        for npc in npc_states:
+            if npc["actor_state"]["sub_type"] == "ACTOR_SUB_SOLDIER":  # 小兵类型
+                minions.append(npc)
+
+        if not player_hero:
+            raise ValueError("未找到玩家英雄状态")
+
+        return player_hero, enemy_heroes, minions
+    
+    def decide_action(player_hero, enemy_heroes, minions):
+        # 检查敌方英雄是否在攻击范围内
+        if is_enemy_hero_in_range(player_hero, enemy_heroes):
+            print("敌方英雄在攻击范围内，停止补兵，保持安全")
+            return None  # 或者返回一个保守的行动，例如后退
+
+        # 找到生命值百分比最低的小兵
+        target_minion = get_lowest_hp_minion(minions)
+        if target_minion:
+            print("攻击目标小兵的全部数据如下：")
+            print(json.dumps(target_minion, indent=4, ensure_ascii=False))
+            print(f"选择攻击小兵: ID={target_minion['actor_state']['runtime_id']}，剩余HP百分比={target_minion['actor_state']['hp'] / target_minion['actor_state']['max_hp']:.2f}")
+            return target_minion
+
+        print("没有可以补刀的小兵")
+        return None
+    
+    def is_enemy_hero_in_range(player_hero, enemy_heroes, safe_distance=10000):
+        hero_location = player_hero["actor_state"]["location"]
+
+        for enemy_hero in enemy_heroes:
+            enemy_location = enemy_hero["actor_state"]["location"]
+            distance = ((hero_location["x"] - enemy_location["x"]) ** 2 +
+                        (hero_location["z"] - enemy_location["z"]) ** 2) ** 0.5
+
+            if distance <= safe_distance:
+                return True
+
+        return False
+
+    def get_lowest_hp_minion(minions):
+        lowest_hp_minion = None
+        lowest_hp_percentage = float('inf')
+
+        for minion in minions:
+            minion_state = minion["actor_state"]
+            if minion_state["hp"] > 0:
+                hp_percentage = minion_state["hp"] / minion_state["max_hp"]
+                if hp_percentage < lowest_hp_percentage:
+                    lowest_hp_percentage = hp_percentage
+                    lowest_hp_minion = minion
+
+        return lowest_hp_minion
+    
+    def print_all_minions(minions):
+        print("当前帧所有小兵的数据如下：")
+        for minion in minions:
+            print(json.dumps(minion, indent=4, ensure_ascii=False))
 
     @learn_wrapper
     def learn(self, list_sample_data):
