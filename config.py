@@ -32,18 +32,19 @@ class GameConfig:
     # Set the weight of each reward item and use it in reward_manager
     # 设置各个回报项的权重，在reward_manager中使用
     REWARD_WEIGHT_DICT = {
-        "hp_point": 2.0,
-        "tower_hp_point": 5.0,
-        "money": 0.006,
-        "exp": 0.006,
+        "hp_point": 3.0,
+        "tower_hp_point": 4.0,
+        "money": 0.02,
+        "exp": 0.012,
         "ep_rate": 0.75,
-        "death": -1.0,
-        "kill": -0.6,
-        "last_hit": 0.6,
-        "forward": 0.01,
-        "attack_enemy_hero": 1.0,  # 根据需要调整权重
-        "pick_health_pack": 3.0,  # 根据需要调整权重
+        "death": -2.0,
+        "kill": 0.5,
+        "last_hit": 1,
+        "forward": 0.02,
+        "attack_enemy_hero": 1.5,  # 根据需要调整权重
+        "pick_health_pack": 2.0,  # 根据需要调整权重
     }
+
     # Time decay factor, used in reward_manager
     # 时间衰减因子，在reward_manager中使用
     TIME_SCALE_ARG = 0
