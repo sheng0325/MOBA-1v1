@@ -43,6 +43,8 @@ class GameConfig:
         "forward": 0.02,
         "attack_enemy_hero": 1.5,  # 根据需要调整权重
         "pick_health_pack": 2.0,  # 根据需要调整权重
+        "avoid_over_aggressive": -1.0,   # 新增奖励项，负权重用于惩罚
+        "attack_enemy_tower": 2.0,       # 新增奖励项，正权重用于奖励
     }
 
     # Time decay factor, used in reward_manager
