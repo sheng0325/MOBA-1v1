@@ -41,7 +41,7 @@ class GameConfig:
         "kill": -0.6,
         "last_hit": 0.6,
         "forward": 0.01,
-        "sight_attack_reward": 1.0,  # 新增视野和攻击范围奖励项的权重
+        "attack_enemy_hero": 5.0,  # 根据需要调整权重
     }
     # Time decay factor, used in reward_manager
     # 时间衰减因子，在reward_manager中使用

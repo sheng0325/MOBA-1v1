@@ -162,6 +162,26 @@ class GameRewardManager:
                             and dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER"
                         ):
                             reward_struct.cur_frame_value -= 1.0
+            # **新增部分：攻击敌方英雄策略奖励**
+            # --------------------------------------------------------
+            elif reward_name == "attack_enemy_hero":
+                # 计算我方与敌方英雄的生命值百分比差距
+                hp_diff_percentage = self.calculate_hp_diff(main_hero, enemy_hero)
+                
+                if hp_diff_percentage >= 0.1:
+                    # 优势范围：主动进攻敌方英雄，奖励 +20
+                    reward_struct.cur_frame_value = 20.0
+                    print(f"优势范围：主动进攻敌方英雄，奖励+20，敌方英雄ID={enemy_hero['actor_state']['runtime_id']}")
+                elif -0.1 <= hp_diff_percentage < 0.1:
+                    # 对峙范围：保持对峙，奖励 +5
+                    reward_struct.cur_frame_value = 5.0
+                    print(f"对峙范围：保持对峙，奖励+5，敌方英雄ID={enemy_hero['actor_state']['runtime_id']}")
+                else:
+                    # 劣势范围：撤退或防御，奖励 +3
+                    reward_struct.cur_frame_value = 3.0
+                    print(f"劣势范围：撤退或防御，奖励+3，敌方英雄ID={enemy_hero['actor_state']['runtime_id']}")
+            # --------------------------------------------------------
+
             # Experience points
             # 经验值
             elif reward_name == "exp":
@@ -170,6 +190,15 @@ class GameRewardManager:
             # 前进
             elif reward_name == "forward":
                 reward_struct.cur_frame_value = self.calculate_forward(main_hero, main_tower, enemy_tower)
+    
+    def calculate_hp_diff(self, player_hero, enemy_hero):
+        """
+        计算我方英雄与敌方英雄的生命值百分比差距
+        """
+        player_hp_percentage = player_hero["actor_state"]["hp"] / player_hero["actor_state"]["max_hp"]
+        enemy_hp_percentage = enemy_hero["actor_state"]["hp"] / enemy_hero["actor_state"]["max_hp"]
+        return player_hp_percentage - enemy_hp_percentage
+
 
     # Calculate the total amount of experience gained using agent level and current experience value
     # 用智能体等级和当前经验值，计算获得经验值的总量
@@ -267,6 +296,8 @@ class GameRewardManager:
                 reward_struct.value = self.m_main_calc_frame_map[reward_name].cur_frame_value
             elif reward_name == "last_hit":
                 reward_struct.value = self.m_main_calc_frame_map[reward_name].cur_frame_value
+            elif reward_name == "attack_enemy_hero":  # **新增部分**
+                reward_struct.value = self.m_cur_calc_frame_map[reward_name].cur_frame_value
             else:
                 # Calculate zero-sum reward
                 # 计算零和奖励
