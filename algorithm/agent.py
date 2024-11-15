@@ -31,6 +31,20 @@ from ppo.config import Config
 from kaiwu_agent.utils.common_func import attached
 from ppo.feature.reward_manager import GameRewardManager
 
+# 打印帧信息
+def save_state_to_file(state_dict, file_name="state_dump.json"):
+    # 获取当前目录
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # 拼接完整的文件路径
+    file_path = os.path.join(current_dir, file_name)
+
+    try:
+        # 将状态信息保存到文件
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(state_dict, f, indent=4, ensure_ascii=False)
+        print(f"状态信息已保存到: {file_path}")
+    except Exception as e:
+        print(f"保存状态信息时出错: {e}")
 
 @attached
 class Agent(BaseAgent):
@@ -204,6 +218,12 @@ class Agent(BaseAgent):
             state_dict["observation"],
             state_dict["legal_action"],
         )
+
+        # 打印
+        # 打印并保存帧状态信息
+        print("保存帧状态信息到文件...")
+        save_state_to_file(state_dict)  # 调用保存函数
+        
         return ObsData(
             feature=feature_vec, legal_action=legal_action, lstm_cell=self.lstm_cell, lstm_hidden=self.lstm_hidden
         )
