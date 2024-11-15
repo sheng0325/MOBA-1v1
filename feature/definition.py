@@ -162,7 +162,7 @@ class FrameCollector:
         rl_data_info.reward = 0
         self.rl_data_map[agent_id][rl_data_info.frame_no] = rl_data_info
 
-
+    def save_last_frame(self, reward, agent_id):
         if len(self.rl_data_map[agent_id]) > 0:
             last_key = list(self.rl_data_map[agent_id].keys())[-1]
             last_rl_data_info = self.rl_data_map[agent_id][last_key]

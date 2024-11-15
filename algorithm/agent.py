@@ -31,6 +31,7 @@ from ppo.config import Config
 from kaiwu_agent.utils.common_func import attached
 from ppo.feature.reward_manager import GameRewardManager
 
+
 @attached
 class Agent(BaseAgent):
     def __init__(self, agent_type="player", device=None, logger=None, monitor=None):
@@ -70,24 +71,6 @@ class Agent(BaseAgent):
 
         super().__init__(agent_type, device, logger, monitor)
 
-    
-    def _extract_observation_features(self, feature):
-        """
-        提取主要的观测特征：主英雄状态、敌方英雄状态和小兵状态。
-        
-        参数:
-            feature: 整体观测特征向量
-        
-        返回:
-            main_hero_state: 主英雄状态特征 (102 维)
-            enemy_hero_state: 敌方英雄状态特征 (102 维)
-            main_camp_soldier_features: 我方第一个小兵的特征 (18 维)
-        """
-        main_hero_state = feature[:102]  # 主英雄状态的特征从第一个元素开始，共102个元素
-        enemy_hero_state = feature[102:204]  # 敌方英雄状态特征，紧接在主英雄状态后面，也为102个元素
-        main_camp_soldier_features = feature[387:405]  # 小兵的状态特征在更后面的位置，我们仅使用第一个小兵的特征
-        return main_hero_state, enemy_hero_state, main_camp_soldier_features
-    
     def _model_inference(self, list_obs_data):
         # 使用网络进行推理
         # Using the network for inference
@@ -123,7 +106,6 @@ class Agent(BaseAgent):
         _lstm_hidden = _lstm_hidden.squeeze(axis=0)
 
         list_act_data = list()
-        
         for i in range(len(legal_action)):
             prob, action, d_action = self._sample_masked_action(logits[i], legal_action[i])
             list_act_data.append(
@@ -177,6 +159,11 @@ class Agent(BaseAgent):
         # 调用agent.predict，执行分布式模型推理
         act_data = self.predict([obs_data])[0]
         self.update_status(obs_data, act_data)
+
+        # 新增：调用 reward_manager 计算奖励
+        rewards = self.reward_manager.result(state_dict["frame_state"])
+        print(f"本帧奖励: {rewards['reward_sum']}")
+
         return self.action_process(state_dict, act_data, False)
 
     def action_process(self, state_dict, act_data, is_stochastic):
@@ -377,3 +364,4 @@ class Agent(BaseAgent):
             return np.argmax(probs)
 
         return np.argmax(np.random.multinomial(1, probs, size=1))
+    

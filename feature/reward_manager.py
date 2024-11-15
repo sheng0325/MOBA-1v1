@@ -46,6 +46,7 @@ class GameRewardManager:
         self.time_scale_arg = GameConfig.TIME_SCALE_ARG
         self.m_main_hero_config_id = -1
         self.m_each_level_max_exp = {}
+        self.main_hero_hp_last = None
 
     # Used to initialize the maximum experience value for each agent level
     # 用于初始化智能体各个等级的最大经验值
@@ -96,6 +97,10 @@ class GameRewardManager:
         main_hero_max_hp = main_hero["actor_state"]["max_hp"]
         main_hero_ep = main_hero["actor_state"]["values"]["ep"]
         main_hero_max_ep = main_hero["actor_state"]["values"]["max_ep"]
+
+        # 更新 main_hero_hp_last
+        if self.main_hero_hp_last is None:
+            self.main_hero_hp_last = main_hero_hp
 
         # Get both defense towers
         # 获取双方防御塔
@@ -162,6 +167,61 @@ class GameRewardManager:
                             and dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER"
                         ):
                             reward_struct.cur_frame_value -= 1.0
+            # **新增部分：攻击敌方英雄策略奖励**
+            # --------------------------------------------------------
+            elif reward_name == "attack_enemy_hero":
+                # 计算我方与敌方英雄的生命值百分比差距
+                hp_diff_percentage = self.calculate_hp_diff(main_hero, enemy_hero)
+                
+                if hp_diff_percentage >= 0.1:
+                    # 优势范围：主动进攻敌方英雄，奖励 +5
+                    reward_struct.cur_frame_value = 5.0
+                    print(f"优势范围：主动进攻敌方英雄，奖励+20，敌方英雄ID={enemy_hero['actor_state']['runtime_id']}")
+                elif -0.1 <= hp_diff_percentage < 0.1:
+                    # 对峙范围：保持对峙，奖励 +2
+                    reward_struct.cur_frame_value = 2.0
+                    print(f"对峙范围：保持对峙，奖励+5，敌方英雄ID={enemy_hero['actor_state']['runtime_id']}")
+                else:
+                    # 劣势范围：撤退或防御，奖励 +1
+                    reward_struct.cur_frame_value = 1.0
+                    print(f"劣势范围：撤退或防御，奖励+3，敌方英雄ID={enemy_hero['actor_state']['runtime_id']}")
+            # --------------------------------------------------------
+             # --------------------------------------------------------
+            elif reward_name == "pick_health_pack":
+                reward_struct.cur_frame_value = 0.0  # 初始化当前帧的奖励值
+
+                # 判断我方英雄的生命值是否低于60%
+                hero_hp_percentage = main_hero_hp / main_hero_max_hp
+
+                if hero_hp_percentage < 0.6:
+                    # 生命值低于60%，考虑拾取血包
+
+                    # 评估战场安全性
+                    is_safe = self.evaluate_battlefield_safety(frame_data, camp, main_hero)
+
+                    if is_safe:
+                        # 查找最近的血包
+                        nearest_health_pack = self.find_nearest_health_pack(frame_data, main_hero)
+                        if nearest_health_pack:
+                            # 判断是否成功拾取了血包
+                            if self.has_picked_health_pack(frame_data, main_hero, nearest_health_pack):
+                                # 成功拾取血包，给予奖励
+                                reward_struct.cur_frame_value = 1.0  # 可以根据需要调整奖励值
+                                print(f"成功拾取血包，奖励+{reward_struct.cur_frame_value}")
+                            else:
+                                # 尚未拾取血包，引导前往血包位置
+                                reward_struct.cur_frame_value = 0.5  # 引导前往血包
+                                print(f"生命值低于60%，引导前往最近的血包")
+                        else:
+                            # 没有可用的血包，可能需要等待
+                            reward_struct.cur_frame_value = 0.0
+                            print("没有可用的血包")
+                    else:
+                        # 战场不安全，建议返回防御塔
+                        reward_struct.cur_frame_value = -0.5  # 惩罚试图在不安全情况下拾取血包
+                        print("战场不安全，建议返回防御塔")
+            # --------------------------------------------------------
+
             # Experience points
             # 经验值
             elif reward_name == "exp":
@@ -170,9 +230,112 @@ class GameRewardManager:
             # 前进
             elif reward_name == "forward":
                 reward_struct.cur_frame_value = self.calculate_forward(main_hero, main_tower, enemy_tower)
-             # 视野和攻击范围奖励
-            elif reward_name == "sight_attack_reward":
-                reward_struct.cur_frame_value = self.calculate_sight_attack_reward(main_hero)
+            
+        self.main_hero_hp_last = main_hero_hp
+
+    
+    # **新增辅助方法**
+
+    def evaluate_battlefield_safety(self, frame_data, camp, main_hero):
+        """
+        评估战场安全性，判断是否安全去拾取血包
+        """
+        # 获取敌方英雄列表
+        enemy_heroes = []
+        for hero in frame_data["hero_states"]:
+            if hero["actor_state"]["camp"] != camp:
+                enemy_heroes.append(hero)
+
+        hero_position = (
+            main_hero["actor_state"]["location"]["x"],
+            main_hero["actor_state"]["location"]["z"]
+        )
+
+        # 判断附近是否有敌方英雄
+        safe_distance_threshold = 8000  # 根据实际情况调整，单位可能是厘米
+
+        for enemy_hero in enemy_heroes:
+            enemy_position = (
+                enemy_hero["actor_state"]["location"]["x"],
+                enemy_hero["actor_state"]["location"]["z"]
+            )
+            distance = self.calculate_distance(hero_position, enemy_position)
+            if distance < safe_distance_threshold:
+                # 敌方英雄在附近，认为不安全
+                return False
+
+        # 没有敌方英雄在附近，认为安全
+        return True
+
+    def find_nearest_health_pack(self, frame_data, main_hero):
+        """
+        查找距离我方英雄最近的血包
+        """
+        hero_position = (
+            main_hero["actor_state"]["location"]["x"],
+            main_hero["actor_state"]["location"]["z"]
+        )
+
+        # 从 frame_data 中获取 health_packs
+        health_packs = frame_data.get("health_packs", [])
+
+        if not health_packs:
+            return None
+
+        min_distance = float('inf')
+        nearest_pack = None
+        for pack in health_packs:
+            # 由于没有 is_available 字段，我们假设所有血包都是可用的
+            pack_position = (
+                pack["collider"]["location"]["x"],
+                pack["collider"]["location"]["z"]
+            )
+            distance = self.calculate_distance(hero_position, pack_position)
+            if distance < min_distance:
+                min_distance = distance
+                nearest_pack = pack
+
+        return nearest_pack
+
+    def has_picked_health_pack(self, frame_data, main_hero, health_pack):
+        """
+        判断我方英雄是否成功拾取了血包
+        """
+        # 检查英雄的生命值是否增加
+        hp_increased = main_hero["actor_state"]["hp"] > self.main_hero_hp_last
+
+        # 检查英雄是否接近血包位置
+        hero_position = (
+            main_hero["actor_state"]["location"]["x"],
+            main_hero["actor_state"]["location"]["z"]
+        )
+        pack_position = (
+            health_pack["collider"]["location"]["x"],
+            health_pack["collider"]["location"]["z"]
+        )
+        distance_to_pack = self.calculate_distance(hero_position, pack_position)
+
+        pick_up_distance_threshold = 200  # 根据实际情况调整，表示拾取血包的距离阈值
+
+        if hp_increased and distance_to_pack < pick_up_distance_threshold:
+            return True
+        else:
+            return False
+
+    def calculate_distance(self, pos1, pos2):
+        """
+        计算两个位置之间的距离
+        """
+        return math.hypot(pos1[0] - pos2[0], pos1[1] - pos2[1])
+    
+    def calculate_hp_diff(self, player_hero, enemy_hero):
+        """
+        计算我方英雄与敌方英雄的生命值百分比差距
+        """
+        player_hp_percentage = player_hero["actor_state"]["hp"] / player_hero["actor_state"]["max_hp"]
+        enemy_hp_percentage = enemy_hero["actor_state"]["hp"] / enemy_hero["actor_state"]["max_hp"]
+        return player_hp_percentage - enemy_hp_percentage
+
 
     # Calculate the total amount of experience gained using agent level and current experience value
     # 用智能体等级和当前经验值，计算获得经验值的总量
@@ -198,28 +361,7 @@ class GameRewardManager:
         if main_hero["actor_state"]["hp"] / main_hero["actor_state"]["max_hp"] > 0.99 and dist_hero2emy > dist_main2emy:
             forward_value = (dist_main2emy - dist_hero2emy) / dist_main2emy
         return forward_value
-    
-    # Calculate the sight and attack range reward
-    # 计算视野和攻击范围奖励
-    def calculate_sight_attack_reward(self, main_hero):
-        reward = 0
-        # 假设英雄视野内有敌人（camp_visible[1] 表示敌方可见），增加奖励
-        if main_hero["actor_state"]["camp_visible"][1]:
-            reward += 0.2  # 视野范围内有敌人奖励值，可调整
-        # 如果敌人在攻击范围内，则进一步增加奖励
-        if main_hero["actor_state"]["attack_range"] >= self.distance_to_target(main_hero):
-            reward += 0.5  # 攻击范围内敌人奖励值，可调整
-        return reward
-    
-    def distance_to_target(self, main_hero):
-        # 计算英雄到攻击目标的距离
-        target_location = main_hero["actor_state"]["location"]  # 目标位置
-        hero_location = main_hero["actor_state"]["location"]
-        return math.sqrt(
-            (hero_location["x"] - target_location["x"]) ** 2 +
-            (hero_location["z"] - target_location["z"]) ** 2
-        )
-    
+
     # Calculate the reward item information for both sides using frame data
     # 用帧数据来计算两边的奖励子项信息
     def frame_data_process(self, frame_data):
@@ -291,6 +433,10 @@ class GameRewardManager:
                 reward_struct.value = self.m_main_calc_frame_map[reward_name].cur_frame_value
             elif reward_name == "last_hit":
                 reward_struct.value = self.m_main_calc_frame_map[reward_name].cur_frame_value
+            elif reward_name == "attack_enemy_hero":  # **新增部分**
+                reward_struct.value = self.m_cur_calc_frame_map[reward_name].cur_frame_value
+            elif reward_name == "pick_health_pack":
+                reward_struct.value = self.m_main_calc_frame_map[reward_name].cur_frame_value
             else:
                 # Calculate zero-sum reward
                 # 计算零和奖励
@@ -308,3 +454,21 @@ class GameRewardManager:
             reward_sum += reward_struct.value * reward_struct.weight
             reward_dict[reward_name] = reward_struct.value
         reward_dict["reward_sum"] = reward_sum
+
+    # 需要在初始化时记录上一次的英雄生命值
+    def frame_data_process(self, frame_data):
+        main_camp, enemy_camp = -1, -1
+
+        for hero in frame_data["hero_states"]:
+            if hero["player_id"] == self.main_hero_player_id:
+                main_camp = hero["actor_state"]["camp"]
+                self.main_hero_camp = main_camp
+                # 初始化或更新上一次的生命值
+                if not hasattr(self, 'main_hero_hp_last'):
+                    self.main_hero_hp_last = hero["actor_state"]["hp"]
+                else:
+                    self.main_hero_hp_last = self.main_hero_hp_last
+            else:
+                enemy_camp = hero["actor_state"]["camp"]
+        self.set_cur_calc_frame_vec(self.m_main_calc_frame_map, frame_data, main_camp)
+        self.set_cur_calc_frame_vec(self.m_enemy_calc_frame_map, frame_data, enemy_camp)
