@@ -361,12 +361,6 @@ class GameRewardManager:
             # 奖励降低，因为没有小兵支援
             reward *= 0.5  # 调整比例，根据需要
         return reward
-
-        # 优化：如果当前没有小兵在附近，减少或取消补刀奖励
-        if not self.minion_positions_current:
-            # 奖励降低，因为没有小兵支援
-            reward *= 0.5  # 调整比例，根据需要
-        return reward
     
     # 新增：计算英雄与小兵的接近度
     def calculate_hero_minion_proximity(self, main_hero):
