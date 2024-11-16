@@ -169,7 +169,7 @@ class GameRewardManager:
             elif reward_name == "stay_with_minions":  # 新增
                 reward_struct.cur_frame_value = self.calculate_hero_minion_proximity(main_hero)
             # **新增部分：避免不必要的伤害**
-            elif reward_name == "avoid_unnecessary_damage":  # 新增
+            elif reward_name == "avoid_unnecessary_damage": # 新增
                 reward_struct.cur_frame_value = self.calculate_avoid_damage(main_hero, enemy_hero, enemy_tower)
             # **新增部分：与小兵协同攻击**
             elif reward_name == "coordinate_attack":  # 新增
