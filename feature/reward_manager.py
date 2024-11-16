@@ -163,8 +163,8 @@ class GameRewardManager:
             # Last hit
             # 补刀
             elif reward_name == "last_hit":
-                # 修改：集成 last_hit_optimized 的逻辑
-                reward_struct.cur_frame_value = self.calculate_last_hit(main_hero, enemy_hero)
+            # 修改：集成 last_hit_optimized 的逻辑，传递 frame_data
+                reward_struct.cur_frame_value = self.calculate_last_hit(frame_data, main_hero, enemy_hero)
             # **新增部分：与小兵保持协同**
             elif reward_name == "stay_with_minions":  # 新增
                 reward_struct.cur_frame_value = self.calculate_hero_minion_proximity(main_hero)
@@ -334,12 +334,12 @@ class GameRewardManager:
     
     # **新增辅助方法**
     # 修改后的 last_hit 计算方法
-    def calculate_last_hit(self, main_hero, enemy_hero):
+    def calculate_last_hit(self, frame_data, main_hero, enemy_hero):
         """
         优化后的补刀奖励计算，考虑小兵的可用性和英雄的位置
         """
         reward = 0.0
-        frame_action = frame_data["frame_action"]
+        frame_action = frame_data.get("frame_action", {})
         if "dead_action" in frame_action:
             dead_actions = frame_action["dead_action"]
             for dead_action in dead_actions:
@@ -355,6 +355,12 @@ class GameRewardManager:
                 ):
                     # 惩罚对手补刀
                     reward -= 1.0
+
+        # 优化：如果当前没有小兵在附近，减少或取消补刀奖励
+        if not self.minion_positions_current:
+            # 奖励降低，因为没有小兵支援
+            reward *= 0.5  # 调整比例，根据需要
+        return reward
 
         # 优化：如果当前没有小兵在附近，减少或取消补刀奖励
         if not self.minion_positions_current:
@@ -566,6 +572,7 @@ class GameRewardManager:
     # 用帧数据来计算两边的奖励子项信息
     
     # 需要在初始化时记录上一次的英雄生命值
+    # 需要在初始化时记录上一次的英雄生命值
     def frame_data_process(self, frame_data):
         main_camp, enemy_camp = -1, -1
 
@@ -581,6 +588,8 @@ class GameRewardManager:
             else:
                 enemy_camp = hero["actor_state"]["camp"]
         self.set_cur_calc_frame_vec(self.m_main_calc_frame_map, frame_data, main_camp)
+        self.set_cur_calc_frame_vec(self.m_enemy_calc_frame_map, frame_data, enemy_camp)
+        
     # Use the values obtained in each frame to calculate the corresponding reward value
     # 用每一帧得到的奖励子项信息来计算对应的奖励值
     def get_reward(self, frame_data, reward_dict):
