@@ -42,11 +42,11 @@ class GameConfig:
         "last_hit": 1.5,
         "forward": 0.05,
         "attack_enemy_hero": 2.0,  # 根据需要调整权重
-        "pick_health_pack": 2.0,  # 根据需要调整权重
+        "pick_health_pack": 2.0,    # 根据需要调整权重
         "stay_with_minions": 1.5,           # 奖励与小兵保持接近
         "avoid_unnecessary_damage": 1.5,    # 惩罚不必要的伤害
         "coordinate_attack": 1.5,           # 奖励与小兵协同攻击
-        "attack_enemy_tower": 3.0,       # 新增奖励项，正权重用于奖励
+        "attack_enemy_tower": 3.0,          # 奖励攻击敌方防御塔
         "skill_usage": 2.0,                  # 新增奖励项，用于奖励技能使用
         "skill_hit": 3.0,                    # 新增奖励项，用于奖励技能命中
         "skill_combo": 5.0,                  # 新增奖励项，用于奖励技能连招

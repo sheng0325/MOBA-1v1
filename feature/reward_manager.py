@@ -169,7 +169,7 @@ class GameRewardManager:
             elif reward_name == "stay_with_minions":  # 新增
                 reward_struct.cur_frame_value = self.calculate_hero_minion_proximity(main_hero)
             # **新增部分：避免不必要的伤害**
-            elif reward_name == "avoid_unnecessary_damage": # 新增
+            elif reward_name == "avoid_unnecessary_damage":
                 reward_struct.cur_frame_value = self.calculate_avoid_damage(main_hero, enemy_hero, enemy_tower)
             # **新增部分：与小兵协同攻击**
             elif reward_name == "coordinate_attack":  # 新增
@@ -228,7 +228,7 @@ class GameRewardManager:
             # --------------------------------------------------------
             # **策略1和策略2逻辑融合到攻击敌方英雄奖励中**
             elif reward_name == "attack_enemy_hero":
-                            reward_struct.cur_frame_value = self.calculate_attack_enemy_hero(main_hero, enemy_hero, enemy_tower)
+                reward_struct.cur_frame_value = self.calculate_attack_enemy_hero(main_hero, enemy_hero, enemy_tower, main_tower)
             # Experience points
             # 经验值
             elif reward_name == "exp":
@@ -296,7 +296,7 @@ class GameRewardManager:
         return reward
     
         # 攻击敌方英雄策略奖励
-    def calculate_attack_enemy_hero(self, main_hero, enemy_hero, enemy_tower):
+    def calculate_attack_enemy_hero(self, main_hero, enemy_hero, enemy_tower, main_tower):
         hp_diff_percentage = self.calculate_hp_diff(main_hero, enemy_hero)
         reward = 0.0
 
@@ -382,14 +382,14 @@ class GameRewardManager:
     # 新增：避免不必要的伤害
     def calculate_avoid_damage(self, main_hero, enemy_hero, enemy_tower):
         hp_lost = self.main_hero_hp_last - main_hero["actor_state"]["hp"]
-        penalty = 0.0
+        reward = 0.0
         if hp_lost > 0:
-            # 假设任何生命值损失都是不必要的伤害，进行惩罚
-            penalty = -hp_lost / main_hero["actor_state"]["max_hp"]
-        # 额外惩罚如果在敌方防御塔范围内
+            # 假设任何生命值损失都是不必要的伤害，进行负向奖励
+            reward -= hp_lost / main_hero["actor_state"]["max_hp"]
+        # 额外负向奖励如果在敌方防御塔范围内
         if self.is_in_enemy_tower_range(main_hero, enemy_tower):
-            penalty += -1.0
-        return penalty
+            reward -= 1.0
+        return reward
 
     # 新增：与小兵协同攻击
     def calculate_coordinate_attack(self, main_hero, enemy_tower):
