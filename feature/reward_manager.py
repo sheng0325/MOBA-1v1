@@ -564,6 +564,7 @@ class GameRewardManager:
 
     # Calculate the reward item information for both sides using frame data
     # 用帧数据来计算两边的奖励子项信息
+    
     # 需要在初始化时记录上一次的英雄生命值
     def frame_data_process(self, frame_data):
         main_camp, enemy_camp = -1, -1
@@ -580,8 +581,6 @@ class GameRewardManager:
             else:
                 enemy_camp = hero["actor_state"]["camp"]
         self.set_cur_calc_frame_vec(self.m_main_calc_frame_map, frame_data, main_camp)
-        self.set_cur_calc_frame_vec(self.m_enemy_calc_frame_map, frame_data, enemy_camp)
-
     # Use the values obtained in each frame to calculate the corresponding reward value
     # 用每一帧得到的奖励子项信息来计算对应的奖励值
     def get_reward(self, frame_data, reward_dict):
