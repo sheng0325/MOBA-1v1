@@ -670,21 +670,3 @@ class GameRewardManager:
             reward_sum += reward_struct.value * reward_struct.weight
             reward_dict[reward_name] = reward_struct.value
         reward_dict["reward_sum"] = reward_sum
-
-    # 需要在初始化时记录上一次的英雄生命值
-    def frame_data_process(self, frame_data):
-        main_camp, enemy_camp = -1, -1
-
-        for hero in frame_data["hero_states"]:
-            if hero["player_id"] == self.main_hero_player_id:
-                main_camp = hero["actor_state"]["camp"]
-                self.main_hero_camp = main_camp
-                # 初始化或更新上一次的生命值
-                if not hasattr(self, 'main_hero_hp_last'):
-                    self.main_hero_hp_last = hero["actor_state"]["hp"]
-                else:
-                    self.main_hero_hp_last = self.main_hero_hp_last
-            else:
-                enemy_camp = hero["actor_state"]["camp"]
-        self.set_cur_calc_frame_vec(self.m_main_calc_frame_map, frame_data, main_camp)
-        self.set_cur_calc_frame_vec(self.m_enemy_calc_frame_map, frame_data, enemy_camp)

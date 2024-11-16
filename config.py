@@ -38,7 +38,7 @@ class GameConfig:
         "exp": 0.012,
         "ep_rate": 0.75,
         "death": -2.0,
-        "kill": 0.5,
+        "kill": 1.5,
         "last_hit": 1.5,
         "forward": 0.02,
         "attack_enemy_hero": 1.5,  # 根据需要调整权重
@@ -113,7 +113,7 @@ class Config:
         512,
     ]
     SERI_VEC_SPLIT_SHAPE = [(725,), (85,)]
-    INIT_LEARNING_RATE_START = 0.0001
+    INIT_LEARNING_RATE_START = 0.0003
     BETA_START = 0.025
     LOG_EPSILON = 1e-6
     LABEL_SIZE_LIST = [12, 16, 16, 16, 16, 9]
@@ -162,7 +162,7 @@ class Config:
     LEGAL_ACTION_SIZE_LIST = LABEL_SIZE_LIST.copy()
     LEGAL_ACTION_SIZE_LIST[-1] = LEGAL_ACTION_SIZE_LIST[-1] * LEGAL_ACTION_SIZE_LIST[0]
 
-    GAMMA = 0.98
+    GAMMA = 0.95
     LAMDA = 0.95
 
     USE_GRAD_CLIP = True
