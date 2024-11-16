@@ -194,7 +194,6 @@ class Agent(BaseAgent):
 
         # 新增：调用 reward_manager 计算奖励
         rewards = self.reward_manager.result(state_dict["frame_state"])
-        total_reward = rewards["reward_sum"]
         print(f"本帧奖励: {rewards['reward_sum']}")
 
         return self.action_process(state_dict, act_data, False)
