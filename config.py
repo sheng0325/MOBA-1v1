@@ -32,22 +32,22 @@ class GameConfig:
     # Set the weight of each reward item and use it in reward_manager
     # 设置各个回报项的权重，在reward_manager中使用
     REWARD_WEIGHT_DICT = {
-        "hp_point": 3.0,
-        "tower_hp_point": 4.0,
-        "money": 0.02,
-        "exp": 0.012,
+        "hp_point": 4.0,
+        "tower_hp_point": 5.0,
+        "money": 0.05,
+        "exp": 0.02,
         "ep_rate": 0.75,
-        "death": -2.0,
-        "kill": 1.5,
+        "death": -3.0,
+        "kill": 2.0,
         "last_hit": 1.5,
-        "forward": 0.02,
-        "attack_enemy_hero": 1.5,  # 根据需要调整权重
+        "forward": 0.05,
+        "attack_enemy_hero": 2.0,  # 根据需要调整权重
         "pick_health_pack": 2.0,  # 根据需要调整权重
-        "stay_with_minions": 1.0,           # 奖励与小兵保持接近
-        "avoid_unnecessary_damage": 1.0,    # 惩罚不必要的伤害
-        "coordinate_attack": 1.0,           # 奖励与小兵协同攻击
+        "stay_with_minions": 1.5,           # 奖励与小兵保持接近
+        "avoid_unnecessary_damage": 1.5,    # 惩罚不必要的伤害
+        "coordinate_attack": 1.5,           # 奖励与小兵协同攻击
         # "avoid_over_aggressive": -1.0,   # 新增奖励项，负权重用于惩罚
-        "attack_enemy_tower": 2.0,       # 新增奖励项，正权重用于奖励
+        "attack_enemy_tower": 3.0,       # 新增奖励项，正权重用于奖励
     }
 
     # Time decay factor, used in reward_manager
