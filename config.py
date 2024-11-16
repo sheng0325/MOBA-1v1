@@ -49,7 +49,7 @@ class GameConfig:
         "attack_enemy_tower": 3.0,          # 奖励攻击敌方防御塔
         "skill_usage": 2.0,                  # 新增奖励项，用于奖励技能使用
         "skill_hit": 3.0,                    # 新增奖励项，用于奖励技能命中
-        "skill_combo": 5.0,                  # 新增奖励项，用于奖励技能连招
+        "skill_combo": 3.5,                  # 新增奖励项，用于奖励技能连招
     }
 
     # Time decay factor, used in reward_manager

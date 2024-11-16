@@ -75,8 +75,10 @@ class GameRewardManager:
         self.init_max_exp_of_each_hero()
         self.frame_data_process(frame_data)
         self.get_reward(frame_data, self.m_reward_value)
+        self.update_reward_weights(frame_data["frameNo"])
 
         frame_no = frame_data["frameNo"]
+        self.game_time = frame_no
         if self.time_scale_arg > 0:
             for key in self.m_reward_value:
                 self.m_reward_value[key] *= math.pow(0.6, 1.0 * frame_no / self.time_scale_arg)
@@ -353,12 +355,12 @@ class GameRewardManager:
                 ):
                     # 奖励成功补刀
                     reward += 1.0
-                elif (
-                    dead_action["killer"]["runtime_id"] == enemy_hero["actor_state"]["runtime_id"]
-                    and dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER"
-                ):
-                    # 惩罚对手补刀
-                    reward -= 1.0
+                # elif (
+                #     dead_action["killer"]["runtime_id"] == enemy_hero["actor_state"]["runtime_id"]
+                #     and dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER"
+                # ):
+                #     # 惩罚对手补刀
+                #     reward -= 1.0
 
         # 优化：如果当前没有小兵在附近，减少或取消补刀奖励
         if not self.minion_positions_current:
@@ -402,9 +404,9 @@ class GameRewardManager:
         )
         # 如果有小兵在范围内且英雄也在范围内，给予奖励
         if minion_in_range and self.is_in_enemy_tower_range(main_hero, enemy_tower):
-            return 1.0
+            return 2.0
         else:
-            return -0.5  # 如果英雄单独攻击，给予惩罚
+            return 0.0  # 如果英雄单独攻击，给予惩罚
     
     # 技能使用奖励
     def calculate_skill_usage(self, main_hero, enemy_hero):
@@ -467,13 +469,13 @@ class GameRewardManager:
                 if skill["slot_type"] == "SLOT_SKILL_3":
                     # 三技能命中敌方英雄，奖励较高
                     if self.is_enemy_in_skill_range(main_hero, enemy_hero, "SLOT_SKILL_3"):
-                        reward += 5.0
+                        reward += 3.0
                 elif skill["slot_type"] == "SLOT_SKILL_1":
                     # 一技能命中敌方英雄
-                    reward += 3.0
+                    reward += 2.0
                 elif skill["slot_type"] == "SLOT_SKILL_2":
                     # 二技能命中敌方英雄
-                    reward += 3.0
+                    reward += 1.0
         return reward
 
     # 技能连招奖励
@@ -497,7 +499,7 @@ class GameRewardManager:
             # 检查三技能是否在敌方英雄可命中范围内
             if self.is_enemy_in_skill_range(main_hero, enemy_hero, "SLOT_SKILL_3"):
                 # 成功连招，奖励较高
-                reward += 8.0
+                reward += 3.5
         return reward
 
     # 判断敌方英雄是否在指定技能的攻击范围内
@@ -779,3 +781,24 @@ class GameRewardManager:
             reward_sum += reward_struct.value * reward_struct.weight
             reward_dict[reward_name] = reward_struct.value
         reward_dict["reward_sum"] = reward_sum
+
+    def update_reward_weights(self, frame_no):
+        # Define time thresholds for changing focus
+        early_game = 1000  # Adjust based on game duration
+        mid_game = 2000
+
+        # Clear minions focus in early game
+        if frame_no <= early_game:
+            self.m_cur_calc_frame_map["last_hit"].weight = 1.0
+            self.m_cur_calc_frame_map["attack_enemy_hero"].weight = 0.1
+            self.m_cur_calc_frame_map["attack_enemy_tower"].weight = 0.5
+        # Shift focus to attacking hero and towers in mid game
+        elif early_game < frame_no <= mid_game:
+            self.m_cur_calc_frame_map["last_hit"].weight = 0.5
+            self.m_cur_calc_frame_map["attack_enemy_hero"].weight = 0.5
+            self.m_cur_calc_frame_map["attack_enemy_tower"].weight = 1.0
+        # Late game focus on pushing towers and crystals
+        else:
+            self.m_cur_calc_frame_map["last_hit"].weight = 0.1
+            self.m_cur_calc_frame_map["attack_enemy_hero"].weight = 1.0
+            self.m_cur_calc_frame_map["attack_enemy_tower"].weight = 2.0
