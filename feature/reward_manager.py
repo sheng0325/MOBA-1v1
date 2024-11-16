@@ -48,6 +48,9 @@ class GameRewardManager:
         self.m_each_level_max_exp = {}
         self.main_hero_hp_last = None
         self.hp_decrease_last_frame = 0  # 记录上一帧HP减少量
+        # 新增：用于跟踪小兵位置
+        self.minion_positions_last = []
+        self.minion_positions_current = []
 
     # Used to initialize the maximum experience value for each agent level
     # 用于初始化智能体各个等级的最大经验值
@@ -120,7 +123,13 @@ class GameRewardManager:
                     enemy_tower = organ
                 elif organ_subtype == "ACTOR_SUB_CRYSTAL":  # 24 is ACTOR_SUB_CRYSTAL, base crystal
                     enemy_spring = organ
-                    
+        
+        # 新增：获取当前帧的小兵位置
+        self.minion_positions_current = []
+        for npc in npc_list:
+            if npc["sub_type"] == "ACTOR_SUB_SOLDIER" and npc["camp"] == camp:
+                location = npc["location"]
+                self.minion_positions_current.append((location["x"], location["z"]))
 
         for reward_name, reward_struct in cul_calc_frame_map.items():
             reward_struct.last_frame_value = reward_struct.cur_frame_value
@@ -154,21 +163,24 @@ class GameRewardManager:
             # Last hit
             # 补刀
             elif reward_name == "last_hit":
-                reward_struct.cur_frame_value = 0.0
-                frame_action = frame_data["frame_action"]
-                if "dead_action" in frame_action:
-                    dead_actions = frame_action["dead_action"]
-                    for dead_action in dead_actions:
-                        if (
-                            dead_action["killer"]["runtime_id"] == main_hero["actor_state"]["runtime_id"]
-                            and dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER"
-                        ):
-                            reward_struct.cur_frame_value += 1.0
-                        elif (
-                            dead_action["killer"]["runtime_id"] == enemy_hero["actor_state"]["runtime_id"]
-                            and dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER"
-                        ):
-                            reward_struct.cur_frame_value -= 1.0
+                # 修改：集成 last_hit_optimized 的逻辑
+                reward_struct.cur_frame_value = self.calculate_last_hit(main_hero, enemy_hero)
+            # **新增部分：与小兵保持协同**
+            elif reward_name == "stay_with_minions":  # 新增
+                reward_struct.cur_frame_value = self.calculate_hero_minion_proximity(main_hero)
+            # **新增部分：避免不必要的伤害**
+            elif reward_name == "avoid_unnecessary_damage":  # 新增
+                reward_struct.cur_frame_value = self.calculate_avoid_damage(main_hero, enemy_hero, enemy_tower)
+            # **新增部分：与小兵协同攻击**
+            elif reward_name == "coordinate_attack":  # 新增
+                reward_struct.cur_frame_value = self.calculate_coordinate_attack(main_hero, enemy_tower)
+
+            # **新增部分：优化补刀**（如果需要保留，请取消注释）
+            # elif reward_name == "last_hit_optimized":  # 可选新增
+            #     reward_struct.cur_frame_value = self.calculate_last_hit_reward(frame_data, main_hero)
+            # **新增部分：攻击敌方英雄策略奖励**
+
+
                         # **策略1：限制过度激进的追击**
             # elif reward_name == "avoid_over_aggressive":
             #     reward_struct.cur_frame_value = 0.0
@@ -321,6 +333,79 @@ class GameRewardManager:
 
     
     # **新增辅助方法**
+    # 修改后的 last_hit 计算方法
+    def calculate_last_hit(self, main_hero, enemy_hero):
+        """
+        优化后的补刀奖励计算，考虑小兵的可用性和英雄的位置
+        """
+        reward = 0.0
+        frame_action = frame_data["frame_action"]
+        if "dead_action" in frame_action:
+            dead_actions = frame_action["dead_action"]
+            for dead_action in dead_actions:
+                if (
+                    dead_action["killer"]["runtime_id"] == main_hero["actor_state"]["runtime_id"]
+                    and dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER"
+                ):
+                    # 奖励成功补刀
+                    reward += 1.0
+                elif (
+                    dead_action["killer"]["runtime_id"] == enemy_hero["actor_state"]["runtime_id"]
+                    and dead_action["death"]["sub_type"] == "ACTOR_SUB_SOLDIER"
+                ):
+                    # 惩罚对手补刀
+                    reward -= 1.0
+
+        # 优化：如果当前没有小兵在附近，减少或取消补刀奖励
+        if not self.minion_positions_current:
+            # 奖励降低，因为没有小兵支援
+            reward *= 0.5  # 调整比例，根据需要
+        return reward
+    
+    # 新增：计算英雄与小兵的接近度
+    def calculate_hero_minion_proximity(self, main_hero):
+        hero_pos = (main_hero["actor_state"]["location"]["x"], main_hero["actor_state"]["location"]["z"])
+        if not self.minion_positions_current:
+            return -1.0  # 如果没有小兵在附近，给予惩罚
+        distances = [self.calculate_distance(hero_pos, minion_pos) for minion_pos in self.minion_positions_current]
+        min_distance = min(distances)
+        proximity_threshold = 5000  # 根据需要调整
+        if min_distance <= proximity_threshold:
+            return 1.0  # 奖励保持与小兵的接近
+        else:
+            return -1.0  # 惩罚过于远离小兵
+
+    # 新增：避免不必要的伤害
+    def calculate_avoid_damage(self, main_hero, enemy_hero, enemy_tower):
+        hp_lost = self.main_hero_hp_last - main_hero["actor_state"]["hp"]
+        penalty = 0.0
+        if hp_lost > 0:
+            # 假设任何生命值损失都是不必要的伤害，进行惩罚
+            penalty = -hp_lost / main_hero["actor_state"]["max_hp"]
+        # 额外惩罚如果在敌方防御塔范围内
+        if self.is_in_enemy_tower_range(main_hero, enemy_tower):
+            penalty += -1.0
+        return penalty
+
+    # 新增：与小兵协同攻击
+    def calculate_coordinate_attack(self, main_hero, enemy_tower):
+        hero_pos = (main_hero["actor_state"]["location"]["x"], main_hero["actor_state"]["location"]["z"])
+        # 检查是否有小兵在敌方防御塔攻击范围内
+        enemy_tower_pos = (enemy_tower["location"]["x"], enemy_tower["location"]["z"])
+        minion_in_range = any(
+            self.calculate_distance(minion_pos, enemy_tower_pos) <= enemy_tower["attack_range"]
+            for minion_pos in self.minion_positions_current
+        )
+        # 如果有小兵在范围内且英雄也在范围内，给予奖励
+        if minion_in_range and self.is_in_enemy_tower_range(main_hero, enemy_tower):
+            return 1.0
+        else:
+            return -0.5  # 如果英雄单独攻击，给予惩罚
+
+    # Utility method to calculate distance
+    def calculate_distance(self, pos1, pos2):
+        return math.hypot(pos1[0] - pos2[0], pos1[1] - pos2[1])
+    
     def is_in_enemy_tower_range(self, main_hero, enemy_tower):
         """
         判断英雄是否在敌方防御塔的攻击范围内
@@ -328,7 +413,7 @@ class GameRewardManager:
         hero_pos = (main_hero["actor_state"]["location"]["x"], main_hero["actor_state"]["location"]["z"])
         tower_pos = (enemy_tower["location"]["x"], enemy_tower["location"]["z"])
         distance = self.calculate_distance(hero_pos, tower_pos)
-        tower_attack_range = 8810  # 根据实际游戏参数调整
+        tower_attack_range = enemy_tower["attack_range"]  # 使用实际防御塔攻击范围
         return distance < tower_attack_range
 
     def is_near_enemy_hero(self, main_hero, enemy_hero):
@@ -430,7 +515,7 @@ class GameRewardManager:
         )
         distance_to_pack = self.calculate_distance(hero_position, pack_position)
 
-        pick_up_distance_threshold = 200  # 根据实际情况调整，表示拾取血包的距离阈值
+        pick_up_distance_threshold = 1000  # 根据实际情况调整，表示拾取血包的距离阈值
 
         if hp_increased and distance_to_pack < pick_up_distance_threshold:
             return True
@@ -479,6 +564,7 @@ class GameRewardManager:
 
     # Calculate the reward item information for both sides using frame data
     # 用帧数据来计算两边的奖励子项信息
+    # 需要在初始化时记录上一次的英雄生命值
     def frame_data_process(self, frame_data):
         main_camp, enemy_camp = -1, -1
 
@@ -486,6 +572,11 @@ class GameRewardManager:
             if hero["player_id"] == self.main_hero_player_id:
                 main_camp = hero["actor_state"]["camp"]
                 self.main_hero_camp = main_camp
+                # 初始化或更新上一次的生命值
+                if not hasattr(self, 'main_hero_hp_last'):
+                    self.main_hero_hp_last = hero["actor_state"]["hp"]
+                else:
+                    self.main_hero_hp_last = self.main_hero_hp_last
             else:
                 enemy_camp = hero["actor_state"]["camp"]
         self.set_cur_calc_frame_vec(self.m_main_calc_frame_map, frame_data, main_camp)
@@ -552,6 +643,12 @@ class GameRewardManager:
                 reward_struct.value = self.m_cur_calc_frame_map[reward_name].cur_frame_value
             elif reward_name == "pick_health_pack":
                 reward_struct.value = self.m_main_calc_frame_map[reward_name].cur_frame_value
+            elif reward_name == "stay_with_minions":  # 新增
+                reward_struct.value = reward_struct.cur_frame_value
+            elif reward_name == "avoid_unnecessary_damage":  # 新增
+                reward_struct.value = reward_struct.cur_frame_value
+            elif reward_name == "coordinate_attack":  # 新增
+                reward_struct.value = reward_struct.cur_frame_value
             # elif reward_name == "avoid_over_aggressive":
             #     reward_struct.value = self.m_cur_calc_frame_map[reward_name].cur_frame_value
             elif reward_name == "attack_enemy_tower":

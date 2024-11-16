@@ -10,6 +10,8 @@ Author: Tencent AI Arena Authors
 
 import torch
 import math
+import os
+import json
 
 torch.set_num_threads(1)
 torch.set_num_interop_threads(1)
@@ -71,38 +73,36 @@ class Agent(BaseAgent):
 
         super().__init__(agent_type, device, logger, monitor)
 
-    def save_state_dict_to_file(self, state_dict, file_prefix="state_log"):
-            """
-            保存每帧的 state_dict 到本地文件
-            :param state_dict: 环境返回的 state_dict
-            :param file_prefix: 文件名前缀
-            """
-            # 确定保存目录为 agent.py 所在目录下的 frame_logs 文件夹
-            file_path = os.path.join(os.path.dirname(__file__), "frame_logs")
-            
-            # 确保目标文件夹存在
-            if not os.path.exists(file_path):
-                os.makedirs(file_path)
+        # 打印frame state_dict
+    def save_state_to_folder(state_dict, folder_name="state_logs", file_prefix="state_log"):
+        """
+        保存每一帧的状态信息到当前目录下的指定文件夹中
+        :param state_dict: 环境返回的 state_dict
+        :param folder_name: 文件夹名称
+        :param file_prefix: 文件名前缀
+        """
+        # 获取当前目录并创建目标文件夹路径
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        folder_path = os.path.join(current_dir, folder_name)
 
-            # 自动生成文件名，格式为 state_log_<game_id>_<frame_no>.json
-            frame_no = state_dict.get("frame_no", "unknown")
-            game_id = state_dict.get("game_id", "unknown")
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            file_name = f"{file_prefix}_game_{game_id}_frame_{frame_no}_{timestamp}.json"
-            full_path = os.path.join(file_path, file_name)
+        # 如果文件夹不存在，则创建
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+            print(f"已创建文件夹: {folder_path}")
 
-            # 转换为可序列化的格式并保存
-            try:
-                serializable_state_dict = {
-                    key: value if isinstance(value, (int, float, str, list, dict))
-                    else str(value)
-                    for key, value in state_dict.items()
-                }
-                with open(full_path, "w") as f:
-                    json.dump(serializable_state_dict, f, indent=4)
-                self.logger.info(f"Saved state_dict to {full_path}")
-            except Exception as e:
-                self.logger.error(f"Failed to save state_dict: {e}")
+        # 自动生成文件名，格式为 state_log_<game_id>_frame_<frame_no>.json
+        frame_no = state_dict.get("frame_no", "unknown")
+        game_id = state_dict.get("game_id", "unknown")
+        file_name = f"{file_prefix}_game_{game_id}_frame_{frame_no}.json"
+        file_path = os.path.join(folder_path, file_name)
+
+        try:
+            # 将状态信息保存到文件
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(state_dict, f, indent=4, ensure_ascii=False)
+            print(f"状态信息已保存到: {file_path}")
+        except Exception as e:
+            print(f"保存状态信息时出错: {e}")
 
     def _model_inference(self, list_obs_data):
         # 使用网络进行推理
@@ -216,7 +216,7 @@ class Agent(BaseAgent):
         )
 
         # 记录frame
-        self.save_state_dict_to_file(state_dict) 
+        save_state_to_folder(state_dict)
 
         return ObsData(
             feature=feature_vec, legal_action=legal_action, lstm_cell=self.lstm_cell, lstm_hidden=self.lstm_hidden

@@ -43,6 +43,9 @@ class GameConfig:
         "forward": 0.02,
         "attack_enemy_hero": 1.5,  # 根据需要调整权重
         "pick_health_pack": 2.0,  # 根据需要调整权重
+        "stay_with_minions": 1.0,           # 奖励与小兵保持接近
+        "avoid_unnecessary_damage": 1.0,    # 惩罚不必要的伤害
+        "coordinate_attack": 1.0,           # 奖励与小兵协同攻击
         # "avoid_over_aggressive": -1.0,   # 新增奖励项，负权重用于惩罚
         "attack_enemy_tower": 2.0,       # 新增奖励项，正权重用于奖励
     }
