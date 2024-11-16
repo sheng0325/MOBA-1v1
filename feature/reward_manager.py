@@ -170,24 +170,24 @@ class GameRewardManager:
                         ):
                             reward_struct.cur_frame_value -= 1.0
                         # **策略1：限制过度激进的追击**
-            elif reward_name == "avoid_over_aggressive":
-                reward_struct.cur_frame_value = 0.0
-                # 检查英雄是否在敌方防御塔范围内
-                if self.is_in_enemy_tower_range(main_hero, enemy_tower):
-                    # 在敌方防御塔范围内，给予惩罚
-                    reward_struct.cur_frame_value = -1.0
-                else:
-                    # 不在敌方防御塔范围内，给予轻微奖励，鼓励安全行动
-                    reward_struct.cur_frame_value = 0.1
-                # 检查英雄的生命值
-                hero_hp_percentage = main_hero_hp / main_hero_max_hp
-                if hero_hp_percentage < 0.3:
-                    # 生命值过低，且靠近敌方英雄，给予惩罚
-                    if self.is_near_enemy_hero(main_hero, enemy_hero):
-                        reward_struct.cur_frame_value += -0.5
-                # 如果英雄生命值较低且远离己方防御塔，给予惩罚
-                if self.is_far_from_own_tower(main_hero, main_tower) and hero_hp_percentage < 0.3:
-                    reward_struct.cur_frame_value += -0.5
+            # elif reward_name == "avoid_over_aggressive":
+            #     reward_struct.cur_frame_value = 0.0
+            #     # 检查英雄是否在敌方防御塔范围内
+            #     if self.is_in_enemy_tower_range(main_hero, enemy_tower):
+            #         # 在敌方防御塔范围内，给予惩罚
+            #         reward_struct.cur_frame_value = -1.0
+            #     else:
+            #         # 不在敌方防御塔范围内，给予轻微奖励，鼓励安全行动
+            #         reward_struct.cur_frame_value = 0.1
+            #     # 检查英雄的生命值
+            #     hero_hp_percentage = main_hero_hp / main_hero_max_hp
+            #     if hero_hp_percentage < 0.3:
+            #         # 生命值过低，且靠近敌方英雄，给予惩罚
+            #         if self.is_near_enemy_hero(main_hero, enemy_hero):
+            #             reward_struct.cur_frame_value += -0.5
+            #     # 如果英雄生命值较低且远离己方防御塔，给予惩罚
+            #     if self.is_far_from_own_tower(main_hero, main_tower) and hero_hp_percentage < 0.3:
+            #         reward_struct.cur_frame_value += -0.5
             # **策略2：在无法检测小兵的情况下攻击防御塔**
             elif reward_name == "attack_enemy_tower":
                 reward_struct.cur_frame_value = 0.0
@@ -203,22 +203,22 @@ class GameRewardManager:
                         reward_struct.cur_frame_value = 1.0
             # **新增部分：攻击敌方英雄策略奖励**
             # --------------------------------------------------------
-            elif reward_name == "attack_enemy_hero":
-                # 计算我方与敌方英雄的生命值百分比差距
-                hp_diff_percentage = self.calculate_hp_diff(main_hero, enemy_hero)
+            # elif reward_name == "attack_enemy_hero":
+            #     # 计算我方与敌方英雄的生命值百分比差距
+            #     hp_diff_percentage = self.calculate_hp_diff(main_hero, enemy_hero)
                 
-                if hp_diff_percentage >= 0.1:
-                    # 优势范围：主动进攻敌方英雄，奖励 +5
-                    reward_struct.cur_frame_value = 5.0
-                    print(f"优势范围：主动进攻敌方英雄，奖励+20，敌方英雄ID={enemy_hero['actor_state']['runtime_id']}")
-                elif -0.1 <= hp_diff_percentage < 0.1:
-                    # 对峙范围：保持对峙，奖励 +2
-                    reward_struct.cur_frame_value = 2.0
-                    print(f"对峙范围：保持对峙，奖励+5，敌方英雄ID={enemy_hero['actor_state']['runtime_id']}")
-                else:
-                    # 劣势范围：撤退或防御，奖励 +1
-                    reward_struct.cur_frame_value = 1.0
-                    print(f"劣势范围：撤退或防御，奖励+3，敌方英雄ID={enemy_hero['actor_state']['runtime_id']}")
+            #     if hp_diff_percentage >= 0.1:
+            #         # 优势范围：主动进攻敌方英雄，奖励 +5
+            #         reward_struct.cur_frame_value = 5.0
+            #         print(f"优势范围：主动进攻敌方英雄，奖励+20，敌方英雄ID={enemy_hero['actor_state']['runtime_id']}")
+            #     elif -0.1 <= hp_diff_percentage < 0.1:
+            #         # 对峙范围：保持对峙，奖励 +2
+            #         reward_struct.cur_frame_value = 2.0
+            #         print(f"对峙范围：保持对峙，奖励+5，敌方英雄ID={enemy_hero['actor_state']['runtime_id']}")
+            #     else:
+            #         # 劣势范围：撤退或防御，奖励 +1
+            #         reward_struct.cur_frame_value = 1.0
+            #         print(f"劣势范围：撤退或防御，奖励+3，敌方英雄ID={enemy_hero['actor_state']['runtime_id']}")
             # --------------------------------------------------------
              # --------------------------------------------------------
             elif reward_name == "pick_health_pack":
@@ -254,8 +254,60 @@ class GameRewardManager:
                         # 战场不安全，建议返回防御塔
                         reward_struct.cur_frame_value = -0.5  # 惩罚试图在不安全情况下拾取血包
                         print("战场不安全，建议返回防御塔")
-            # --------------------------------------------------------
+                    # **新增部分：当生命值低于30%时，优先回到己方泉水**
 
+                if hero_hp_percentage < 0.3:
+                    # 获取己方泉水位置
+                    own_spring = main_spring
+                    if own_spring:
+                        own_spring_pos = (
+                            own_spring["location"]["x"],
+                            own_spring["location"]["z"]
+                        )
+                        hero_pos = (
+                            main_hero["actor_state"]["location"]["x"],
+                            main_hero["actor_state"]["location"]["z"]
+                        )
+                        distance_to_spring = self.calculate_distance(hero_pos, own_spring_pos)
+                        # 如果英雄靠近己方泉水，给予额外奖励
+                        if distance_to_spring < 500:  # 调整阈值
+                            reward_struct.cur_frame_value += 2.0  # 增加奖励值
+                            print("英雄靠近己方泉水，给予额外奖励+2.0")
+                        else:
+                            # 引导英雄朝己方泉水移动，给予引导奖励
+                            reward_struct.cur_frame_value += 1.0  # 引导前往泉水
+                            print("生命值低于30%，引导前往己方泉水")
+            # --------------------------------------------------------
+            # **策略1和策略2逻辑融合到攻击敌方英雄奖励中**
+            elif reward_name == "attack_enemy_hero":
+                # 计算我方与敌方英雄的生命值百分比差距
+                hp_diff_percentage = self.calculate_hp_diff(main_hero, enemy_hero)
+                reward_struct.cur_frame_value = 0.0
+
+                # 首先，检查是否在敌方防御塔范围内
+                if self.is_in_enemy_tower_range(main_hero, enemy_tower):
+                    # 在敌方防御塔范围内，不鼓励攻击敌方英雄，给予惩罚
+                    reward_struct.cur_frame_value += -1.0
+                else:
+                    # 不在敌方防御塔范围内
+                    if hp_diff_percentage >= 0.1:
+                        # 优势范围：主动进攻敌方英雄，奖励 +5
+                        reward_struct.cur_frame_value += 5.0
+                    elif -0.1 <= hp_diff_percentage < 0.1:
+                        # 对峙范围：保持对峙，奖励 +2
+                        reward_struct.cur_frame_value += 2.0
+                    else:
+                        # 劣势范围：撤退或防御，奖励 +1
+                        reward_struct.cur_frame_value += 1.0
+                # 检查英雄的生命值
+                hero_hp_percentage = main_hero_hp / main_hero_max_hp
+                if hero_hp_percentage < 0.3:
+                    # 生命值过低，且靠近敌方英雄，给予惩罚
+                    if self.is_near_enemy_hero(main_hero, enemy_hero):
+                        reward_struct.cur_frame_value += -0.5
+                    # 如果英雄生命值较低且远离己方防御塔，给予惩罚
+                    if self.is_far_from_own_tower(main_hero, main_tower):
+                        reward_struct.cur_frame_value += -0.5
             # Experience points
             # 经验值
             elif reward_name == "exp":
@@ -276,7 +328,7 @@ class GameRewardManager:
         hero_pos = (main_hero["actor_state"]["location"]["x"], main_hero["actor_state"]["location"]["z"])
         tower_pos = (enemy_tower["location"]["x"], enemy_tower["location"]["z"])
         distance = self.calculate_distance(hero_pos, tower_pos)
-        tower_attack_range = 8000  # 根据实际游戏参数调整
+        tower_attack_range = 8810  # 根据实际游戏参数调整
         return distance < tower_attack_range
 
     def is_near_enemy_hero(self, main_hero, enemy_hero):
@@ -296,7 +348,7 @@ class GameRewardManager:
         hero_pos = (main_hero["actor_state"]["location"]["x"], main_hero["actor_state"]["location"]["z"])
         tower_pos = (main_tower["location"]["x"], main_tower["location"]["z"])
         distance = self.calculate_distance(hero_pos, tower_pos)
-        safe_distance = 15000  # 根据需要调整
+        safe_distance = 8800  # 防御塔的攻击范围:8800
         return distance > safe_distance
 
     def evaluate_battlefield_safety(self, frame_data, camp, main_hero):
@@ -500,8 +552,8 @@ class GameRewardManager:
                 reward_struct.value = self.m_cur_calc_frame_map[reward_name].cur_frame_value
             elif reward_name == "pick_health_pack":
                 reward_struct.value = self.m_main_calc_frame_map[reward_name].cur_frame_value
-            elif reward_name == "avoid_over_aggressive":
-                reward_struct.value = self.m_cur_calc_frame_map[reward_name].cur_frame_value
+            # elif reward_name == "avoid_over_aggressive":
+            #     reward_struct.value = self.m_cur_calc_frame_map[reward_name].cur_frame_value
             elif reward_name == "attack_enemy_tower":
                 reward_struct.value = self.m_cur_calc_frame_map[reward_name].cur_frame_value
             else:
