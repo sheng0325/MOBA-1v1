@@ -39,7 +39,7 @@ class GameConfig:
         "ep_rate": 0.75,
         "death": -2.0,
         "kill": 0.5,
-        "last_hit": 1,
+        "last_hit": 1.5,
         "forward": 0.02,
         "attack_enemy_hero": 1.5,  # 根据需要调整权重
         "pick_health_pack": 2.0,  # 根据需要调整权重

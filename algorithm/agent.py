@@ -71,6 +71,39 @@ class Agent(BaseAgent):
 
         super().__init__(agent_type, device, logger, monitor)
 
+    def save_state_dict_to_file(self, state_dict, file_prefix="state_log"):
+            """
+            保存每帧的 state_dict 到本地文件
+            :param state_dict: 环境返回的 state_dict
+            :param file_prefix: 文件名前缀
+            """
+            # 确定保存目录为 agent.py 所在目录下的 frame_logs 文件夹
+            file_path = os.path.join(os.path.dirname(__file__), "frame_logs")
+            
+            # 确保目标文件夹存在
+            if not os.path.exists(file_path):
+                os.makedirs(file_path)
+
+            # 自动生成文件名，格式为 state_log_<game_id>_<frame_no>.json
+            frame_no = state_dict.get("frame_no", "unknown")
+            game_id = state_dict.get("game_id", "unknown")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            file_name = f"{file_prefix}_game_{game_id}_frame_{frame_no}_{timestamp}.json"
+            full_path = os.path.join(file_path, file_name)
+
+            # 转换为可序列化的格式并保存
+            try:
+                serializable_state_dict = {
+                    key: value if isinstance(value, (int, float, str, list, dict))
+                    else str(value)
+                    for key, value in state_dict.items()
+                }
+                with open(full_path, "w") as f:
+                    json.dump(serializable_state_dict, f, indent=4)
+                self.logger.info(f"Saved state_dict to {full_path}")
+            except Exception as e:
+                self.logger.error(f"Failed to save state_dict: {e}")
+
     def _model_inference(self, list_obs_data):
         # 使用网络进行推理
         # Using the network for inference
@@ -181,6 +214,10 @@ class Agent(BaseAgent):
             state_dict["observation"],
             state_dict["legal_action"],
         )
+
+        # 记录frame
+        self.save_state_dict_to_file(state_dict) 
+
         return ObsData(
             feature=feature_vec, legal_action=legal_action, lstm_cell=self.lstm_cell, lstm_hidden=self.lstm_hidden
         )
