@@ -33,6 +33,36 @@ from ppo.config import Config
 from kaiwu_agent.utils.common_func import attached
 from ppo.feature.reward_manager import GameRewardManager
 
+def save_state_to_folder(state_dict, folder_name="state_logs", file_prefix="state_log"):
+        """
+        保存每一帧的状态信息到当前目录下的指定文件夹中
+        :param state_dict: 环境返回的 state_dict
+        :param folder_name: 文件夹名称
+        :param file_prefix: 文件名前缀
+        """
+        # 获取当前目录并创建目标文件夹路径
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        folder_path = os.path.join(current_dir, folder_name)
+
+        # 如果文件夹不存在，则创建
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+            print(f"已创建文件夹: {folder_path}")
+
+        # 自动生成文件名，格式为 state_log_<game_id>_frame_<frame_no>.json
+        frame_no = state_dict.get("frame_no", "unknown")
+        game_id = state_dict.get("game_id", "unknown")
+        file_name = f"{file_prefix}_game_{game_id}_frame_{frame_no}.json"
+        file_path = os.path.join(folder_path, file_name)
+
+        try:
+            # 将状态信息保存到文件
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(state_dict, f, indent=4, ensure_ascii=False)
+            print(f"状态信息已保存到: {file_path}")
+        except Exception as e:
+            print(f"保存状态信息时出错: {e}")
+
 
 @attached
 class Agent(BaseAgent):
@@ -72,37 +102,6 @@ class Agent(BaseAgent):
         self.monitor = monitor
 
         super().__init__(agent_type, device, logger, monitor)
-
-        # 打印frame state_dict
-    def save_state_to_folder(state_dict, folder_name="state_logs", file_prefix="state_log"):
-        """
-        保存每一帧的状态信息到当前目录下的指定文件夹中
-        :param state_dict: 环境返回的 state_dict
-        :param folder_name: 文件夹名称
-        :param file_prefix: 文件名前缀
-        """
-        # 获取当前目录并创建目标文件夹路径
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        folder_path = os.path.join(current_dir, folder_name)
-
-        # 如果文件夹不存在，则创建
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-            print(f"已创建文件夹: {folder_path}")
-
-        # 自动生成文件名，格式为 state_log_<game_id>_frame_<frame_no>.json
-        frame_no = state_dict.get("frame_no", "unknown")
-        game_id = state_dict.get("game_id", "unknown")
-        file_name = f"{file_prefix}_game_{game_id}_frame_{frame_no}.json"
-        file_path = os.path.join(folder_path, file_name)
-
-        try:
-            # 将状态信息保存到文件
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(state_dict, f, indent=4, ensure_ascii=False)
-            print(f"状态信息已保存到: {file_path}")
-        except Exception as e:
-            print(f"保存状态信息时出错: {e}")
 
     def _model_inference(self, list_obs_data):
         # 使用网络进行推理
@@ -215,8 +214,8 @@ class Agent(BaseAgent):
             state_dict["legal_action"],
         )
 
-        # 记录frame
-        save_state_to_folder(state_dict)
+        # # 记录frame
+        # save_state_to_folder(state_dict)
 
         return ObsData(
             feature=feature_vec, legal_action=legal_action, lstm_cell=self.lstm_cell, lstm_hidden=self.lstm_hidden

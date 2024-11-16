@@ -46,8 +46,10 @@ class GameConfig:
         "stay_with_minions": 1.5,           # 奖励与小兵保持接近
         "avoid_unnecessary_damage": 1.5,    # 惩罚不必要的伤害
         "coordinate_attack": 1.5,           # 奖励与小兵协同攻击
-        # "avoid_over_aggressive": -1.0,   # 新增奖励项，负权重用于惩罚
         "attack_enemy_tower": 3.0,       # 新增奖励项，正权重用于奖励
+        "skill_usage": 2.0,                  # 新增奖励项，用于奖励技能使用
+        "skill_hit": 3.0,                    # 新增奖励项，用于奖励技能命中
+        "skill_combo": 5.0,                  # 新增奖励项，用于奖励技能连招
     }
 
     # Time decay factor, used in reward_manager

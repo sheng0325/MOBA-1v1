@@ -202,17 +202,7 @@ class GameRewardManager:
             #         reward_struct.cur_frame_value += -0.5
             # **策略2：在无法检测小兵的情况下攻击防御塔**
             elif reward_name == "attack_enemy_tower":
-                reward_struct.cur_frame_value = 0.0
-                # 如果英雄靠近敌方防御塔
-                if self.is_in_enemy_tower_range(main_hero, enemy_tower):
-                    # 检查英雄的生命值变化
-                    hp_decrease = self.main_hero_hp_last - main_hero_hp
-                    if hp_decrease > 400:
-                        # 生命值正在减少，可能被防御塔攻击，给予惩罚
-                        reward_struct.cur_frame_value = -1.0
-                    else:
-                        # 生命值未减少，可能安全攻击防御塔，给予奖励
-                        reward_struct.cur_frame_value = 1.0
+                            reward_struct.cur_frame_value = self.calculate_attack_enemy_tower(main_hero, enemy_tower)
             # **新增部分：攻击敌方英雄策略奖励**
             # --------------------------------------------------------
             # elif reward_name == "attack_enemy_hero":
@@ -234,92 +224,11 @@ class GameRewardManager:
             # --------------------------------------------------------
              # --------------------------------------------------------
             elif reward_name == "pick_health_pack":
-                reward_struct.cur_frame_value = 0.0  # 初始化当前帧的奖励值
-
-                # 判断我方英雄的生命值是否低于60%
-                hero_hp_percentage = main_hero_hp / main_hero_max_hp
-
-                if hero_hp_percentage < 0.6:
-                    # 生命值低于60%，考虑拾取血包
-
-                    # 评估战场安全性
-                    is_safe = self.evaluate_battlefield_safety(frame_data, camp, main_hero)
-
-                    if is_safe:
-                        # 查找最近的血包
-                        nearest_health_pack = self.find_nearest_health_pack(frame_data, main_hero)
-                        if nearest_health_pack:
-                            # 判断是否成功拾取了血包
-                            if self.has_picked_health_pack(frame_data, main_hero, nearest_health_pack):
-                                # 成功拾取血包，给予奖励
-                                reward_struct.cur_frame_value = 1.0  # 可以根据需要调整奖励值
-                                print(f"成功拾取血包，奖励+{reward_struct.cur_frame_value}")
-                            else:
-                                # 尚未拾取血包，引导前往血包位置
-                                reward_struct.cur_frame_value = 0.5  # 引导前往血包
-                                print(f"生命值低于60%，引导前往最近的血包")
-                        else:
-                            # 没有可用的血包，可能需要等待
-                            reward_struct.cur_frame_value = 0.0
-                            print("没有可用的血包")
-                    else:
-                        # 战场不安全，建议返回防御塔
-                        reward_struct.cur_frame_value = -0.5  # 惩罚试图在不安全情况下拾取血包
-                        print("战场不安全，建议返回防御塔")
-                    # **新增部分：当生命值低于30%时，优先回到己方泉水**
-
-                if hero_hp_percentage < 0.3:
-                    # 获取己方泉水位置
-                    own_spring = main_spring
-                    if own_spring:
-                        own_spring_pos = (
-                            own_spring["location"]["x"],
-                            own_spring["location"]["z"]
-                        )
-                        hero_pos = (
-                            main_hero["actor_state"]["location"]["x"],
-                            main_hero["actor_state"]["location"]["z"]
-                        )
-                        distance_to_spring = self.calculate_distance(hero_pos, own_spring_pos)
-                        # 如果英雄靠近己方泉水，给予额外奖励
-                        if distance_to_spring < 500:  # 调整阈值
-                            reward_struct.cur_frame_value += 2.0  # 增加奖励值
-                            print("英雄靠近己方泉水，给予额外奖励+2.0")
-                        else:
-                            # 引导英雄朝己方泉水移动，给予引导奖励
-                            reward_struct.cur_frame_value += 1.0  # 引导前往泉水
-                            print("生命值低于30%，引导前往己方泉水")
+                            reward_struct.cur_frame_value = self.calculate_pick_health_pack(frame_data, main_hero, main_spring, camp)
             # --------------------------------------------------------
             # **策略1和策略2逻辑融合到攻击敌方英雄奖励中**
             elif reward_name == "attack_enemy_hero":
-                # 计算我方与敌方英雄的生命值百分比差距
-                hp_diff_percentage = self.calculate_hp_diff(main_hero, enemy_hero)
-                reward_struct.cur_frame_value = 0.0
-
-                # 首先，检查是否在敌方防御塔范围内
-                if self.is_in_enemy_tower_range(main_hero, enemy_tower):
-                    # 在敌方防御塔范围内，不鼓励攻击敌方英雄，给予惩罚
-                    reward_struct.cur_frame_value += -1.0
-                else:
-                    # 不在敌方防御塔范围内
-                    if hp_diff_percentage >= 0.1:
-                        # 优势范围：主动进攻敌方英雄，奖励 +5
-                        reward_struct.cur_frame_value += 5.0
-                    elif -0.1 <= hp_diff_percentage < 0.1:
-                        # 对峙范围：保持对峙，奖励 +2
-                        reward_struct.cur_frame_value += 2.0
-                    else:
-                        # 劣势范围：撤退或防御，奖励 +1
-                        reward_struct.cur_frame_value += 1.0
-                # 检查英雄的生命值
-                hero_hp_percentage = main_hero_hp / main_hero_max_hp
-                if hero_hp_percentage < 0.3:
-                    # 生命值过低，且靠近敌方英雄，给予惩罚
-                    if self.is_near_enemy_hero(main_hero, enemy_hero):
-                        reward_struct.cur_frame_value += -0.5
-                    # 如果英雄生命值较低且远离己方防御塔，给予惩罚
-                    if self.is_far_from_own_tower(main_hero, main_tower):
-                        reward_struct.cur_frame_value += -0.5
+                            reward_struct.cur_frame_value = self.calculate_attack_enemy_hero(main_hero, enemy_hero, enemy_tower)
             # Experience points
             # 经验值
             elif reward_name == "exp":
@@ -328,11 +237,106 @@ class GameRewardManager:
             # 前进
             elif reward_name == "forward":
                 reward_struct.cur_frame_value = self.calculate_forward(main_hero, main_tower, enemy_tower)
+            # 技能使用奖励（新增）
+            elif reward_name == "skill_usage":
+                reward_struct.cur_frame_value = self.calculate_skill_usage(main_hero, enemy_hero)
+            # 技能命中奖励（新增）
+            elif reward_name == "skill_hit":
+                reward_struct.cur_frame_value = self.calculate_skill_hit(main_hero, enemy_hero)
+            # 技能连招奖励（新增）
+            elif reward_name == "skill_combo":
+                reward_struct.cur_frame_value = self.calculate_skill_combo(main_hero, enemy_hero)
             
         self.main_hero_hp_last = main_hero_hp
 
+    def calculate_pick_health_pack(self, frame_data, main_hero, main_spring, camp):
+        reward = 0.0
+        hero_hp = main_hero["actor_state"]["hp"]
+        hero_max_hp = main_hero["actor_state"]["max_hp"]
+        hero_hp_percentage = hero_hp / hero_max_hp
+
+        if hero_hp_percentage < 0.6:
+            # 生命值低于60%，考虑拾取血包
+            is_safe = self.evaluate_battlefield_safety(frame_data, camp, main_hero)
+            if is_safe:
+                nearest_health_pack = self.find_nearest_health_pack(frame_data, main_hero)
+                if nearest_health_pack:
+                    if self.has_picked_health_pack(frame_data, main_hero, nearest_health_pack):
+                        # 成功拾取血包，给予奖励
+                        reward = 1.0
+                    else:
+                        # 尚未拾取血包，引导前往血包位置
+                        reward = 0.5
+                else:
+                    # 没有可用的血包
+                    reward = 0.0
+            else:
+                # 战场不安全，建议返回防御塔
+                reward = -0.5
+
+            if hero_hp_percentage < 0.3:
+                # 生命值低于30%，优先回到己方泉水
+                if main_spring:
+                    own_spring_pos = (
+                        main_spring["location"]["x"],
+                        main_spring["location"]["z"]
+                    )
+                    hero_pos = (
+                        main_hero["actor_state"]["location"]["x"],
+                        main_hero["actor_state"]["location"]["z"]
+                    )
+                    distance_to_spring = self.calculate_distance(hero_pos, own_spring_pos)
+                    if distance_to_spring < 500:
+                        reward += 2.0  # 增加奖励值
+                        print("英雄靠近己方泉水，给予额外奖励+2.0")
+                    else:
+                        # 引导英雄朝己方泉水移动，给予引导奖励
+                        reward += 1.0  # 引导前往泉水
+                        print("生命值低于30%，引导前往己方泉水")
+        return reward
     
-    # **新增辅助方法**
+        # 攻击敌方英雄策略奖励
+    def calculate_attack_enemy_hero(self, main_hero, enemy_hero, enemy_tower):
+        hp_diff_percentage = self.calculate_hp_diff(main_hero, enemy_hero)
+        reward = 0.0
+
+        if self.is_in_enemy_tower_range(main_hero, enemy_tower):
+            # 在敌方防御塔范围内，不鼓励攻击敌方英雄，给予惩罚
+            reward += -1.0
+        else:
+            if hp_diff_percentage >= 0.1:
+                # 优势范围：主动进攻敌方英雄，奖励 +5
+                reward += 5.0
+            elif -0.1 <= hp_diff_percentage < 0.1:
+                # 对峙范围：保持对峙，奖励 +2
+                reward += 2.0
+            else:
+                # 劣势范围：撤退或防御，奖励 +1
+                reward += 1.0
+
+        # 检查英雄的生命值
+        hero_hp_percentage = main_hero["actor_state"]["hp"] / main_hero["actor_state"]["max_hp"]
+        if hero_hp_percentage < 0.3:
+            if self.is_near_enemy_hero(main_hero, enemy_hero):
+                reward += -0.5
+            if self.is_far_from_own_tower(main_hero, main_tower):
+                reward += -0.5
+        return reward
+    
+    # 攻击敌方防御塔
+    def calculate_attack_enemy_tower(self, main_hero, enemy_tower):
+        reward = 0.0
+        if self.is_in_enemy_tower_range(main_hero, enemy_tower):
+            # 检查英雄的生命值变化
+            hp_decrease = self.main_hero_hp_last - main_hero["actor_state"]["hp"]
+            if hp_decrease > 400:
+                # 生命值正在减少，可能被防御塔攻击，给予惩罚
+                reward = -1.0
+            else:
+                # 生命值未减少，可能安全攻击防御塔，给予奖励
+                reward = 1.0
+        return reward
+    
     # 修改后的 last_hit 计算方法
     def calculate_last_hit(self, frame_data, main_hero, enemy_hero):
         """
@@ -401,8 +405,120 @@ class GameRewardManager:
             return 1.0
         else:
             return -0.5  # 如果英雄单独攻击，给予惩罚
+    
+    # 技能使用奖励
+    def calculate_skill_usage(self, main_hero, enemy_hero):
+        reward = 0.0
+        skill_states = main_hero["skill_state"]["slot_states"]
 
-    # Utility method to calculate distance
+        # 获取技能槽对应的技能
+        skill_mapping = {
+            "SLOT_SKILL_0": "normal_attack",
+            "SLOT_SKILL_1": "skill_one",
+            "SLOT_SKILL_2": "skill_two",
+            "SLOT_SKILL_3": "skill_three",
+        }
+
+        # 技能优先级
+        skill_priority = ["skill_three", "skill_one", "skill_two"]
+
+        # 判断敌方英雄是否在三技能范围内
+        enemy_in_skill3_range = False
+        if self.is_enemy_in_skill_range(main_hero, enemy_hero, "SLOT_SKILL_3"):
+            enemy_in_skill3_range = True
+
+        # 技能可用性和命中情况
+        for skill in skill_states:
+            slot_type = skill["slot_type"]
+            skill_name = skill_mapping.get(slot_type, None)
+            if skill_name and skill_name in skill_priority:
+                if skill["usedTimes"] > 0:
+                    # 检查三技能是否仅对敌方英雄使用
+                    if skill_name == "skill_three":
+                        # 检查是否命中敌方英雄
+                        if skill["hitHeroTimes"] > 0 and enemy_in_skill3_range:
+                            # 奖励使用技能
+                            reward += 1.0
+                            # 奖励技能命中敌方英雄
+                            reward += 2.0
+                            # 额外奖励
+                            reward += 2.0
+                        else:
+                            # 三技能未命中敌方英雄，给予惩罚
+                            reward -= 2.0
+                    else:
+                        # 对于其他技能，正常奖励
+                        reward += 1.0
+                        if skill["hitHeroTimes"] > 0:
+                            reward += 2.0
+                else:
+                    # 如果三技能可命中但未使用，给予惩罚
+                    if skill_name == "skill_three" and enemy_in_skill3_range:
+                        reward -= 1.0
+        return reward
+
+    # 技能命中奖励
+    def calculate_skill_hit(self, main_hero, enemy_hero):
+        reward = 0.0
+        skill_states = main_hero["skill_state"]["slot_states"]
+
+        for skill in skill_states:
+            if skill["hitHeroTimes"] > 0:
+                if skill["slot_type"] == "SLOT_SKILL_3":
+                    # 三技能命中敌方英雄，奖励较高
+                    if self.is_enemy_in_skill_range(main_hero, enemy_hero, "SLOT_SKILL_3"):
+                        reward += 5.0
+                elif skill["slot_type"] == "SLOT_SKILL_1":
+                    # 一技能命中敌方英雄
+                    reward += 3.0
+                elif skill["slot_type"] == "SLOT_SKILL_2":
+                    # 二技能命中敌方英雄
+                    reward += 3.0
+        return reward
+
+    # 技能连招奖励
+    def calculate_skill_combo(self, main_hero, enemy_hero):
+        reward = 0.0
+        skill_states = main_hero["skill_state"]["slot_states"]
+
+        # 检查技能使用次数
+        skill_usage = {
+            "SLOT_SKILL_1": 0,  # 一技能
+            "SLOT_SKILL_2": 0,  # 二技能
+            "SLOT_SKILL_3": 0,  # 三技能
+        }
+
+        for skill in skill_states:
+            if skill["slot_type"] in skill_usage:
+                skill_usage[skill["slot_type"]] = skill["usedTimes"]
+
+        # 检查连招是否成功
+        if skill_usage["SLOT_SKILL_3"] > 0 and skill_usage["SLOT_SKILL_1"] > 0:
+            # 检查三技能是否在敌方英雄可命中范围内
+            if self.is_enemy_in_skill_range(main_hero, enemy_hero, "SLOT_SKILL_3"):
+                # 成功连招，奖励较高
+                reward += 8.0
+        return reward
+
+    # 判断敌方英雄是否在指定技能的攻击范围内
+    def is_enemy_in_skill_range(self, main_hero, enemy_hero, skill_slot):
+        """
+        判断敌方英雄是否在指定技能的攻击范围内
+        """
+        skill_ranges = {
+            "SLOT_SKILL_3": 8000,  # 三技能范围
+            "SLOT_SKILL_1": 8000,  # 一技能范围
+            "SLOT_SKILL_2": 8000,  # 二技能范围
+        }
+        if skill_slot not in skill_ranges:
+            return False
+
+        skill_range = skill_ranges[skill_slot]
+        hero_pos = (main_hero["actor_state"]["location"]["x"], main_hero["actor_state"]["location"]["z"])
+        enemy_pos = (enemy_hero["actor_state"]["location"]["x"], enemy_hero["actor_state"]["location"]["z"])
+        distance = self.calculate_distance(hero_pos, enemy_pos)
+        return distance <= skill_range
+
     def calculate_distance(self, pos1, pos2):
         return math.hypot(pos1[0] - pos2[0], pos1[1] - pos2[1])
     
@@ -641,20 +757,11 @@ class GameRewardManager:
                 reward_struct.value = self.m_main_calc_frame_map[reward_name].cur_frame_value
             elif reward_name == "last_hit":
                 reward_struct.value = self.m_main_calc_frame_map[reward_name].cur_frame_value
-            elif reward_name == "attack_enemy_hero":  # **新增部分**
-                reward_struct.value = self.m_cur_calc_frame_map[reward_name].cur_frame_value
-            elif reward_name == "pick_health_pack":
+            elif reward_name in ["attack_enemy_hero", "pick_health_pack", "stay_with_minions",
+                                 "avoid_unnecessary_damage", "coordinate_attack", "attack_enemy_tower",
+                                 "skill_usage", "skill_hit", "skill_combo"]:
+                # 直接使用当前帧的计算值
                 reward_struct.value = self.m_main_calc_frame_map[reward_name].cur_frame_value
-            elif reward_name == "stay_with_minions":  # 新增
-                reward_struct.value = reward_struct.cur_frame_value
-            elif reward_name == "avoid_unnecessary_damage":  # 新增
-                reward_struct.value = reward_struct.cur_frame_value
-            elif reward_name == "coordinate_attack":  # 新增
-                reward_struct.value = reward_struct.cur_frame_value
-            # elif reward_name == "avoid_over_aggressive":
-            #     reward_struct.value = self.m_cur_calc_frame_map[reward_name].cur_frame_value
-            elif reward_name == "attack_enemy_tower":
-                reward_struct.value = self.m_cur_calc_frame_map[reward_name].cur_frame_value
             else:
                 # Calculate zero-sum reward
                 # 计算零和奖励
