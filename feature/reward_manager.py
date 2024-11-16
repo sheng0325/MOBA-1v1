@@ -74,9 +74,12 @@ class GameRewardManager:
     def result(self, frame_data):
         self.init_max_exp_of_each_hero()
         self.frame_data_process(frame_data)
+        self.update_reward_weights(frame_data["frameNo"])
         self.get_reward(frame_data, self.m_reward_value)
 
         frame_no = frame_data["frameNo"]
+        self.game_time = frame_no  # Update game time
+
         if self.time_scale_arg > 0:
             for key in self.m_reward_value:
                 self.m_reward_value[key] *= math.pow(0.6, 1.0 * frame_no / self.time_scale_arg)
@@ -402,9 +405,11 @@ class GameRewardManager:
         )
         # 如果有小兵在范围内且英雄也在范围内，给予奖励
         if minion_in_range and self.is_in_enemy_tower_range(main_hero, enemy_tower):
-            return 1.0
+            return 2.0  # Increased reward
+        elif self.is_in_enemy_tower_range(main_hero, enemy_tower):
+            return -1.0  # Punish if attacking alone
         else:
-            return -0.5  # 如果英雄单独攻击，给予惩罚
+            return 0.0  # Neutral if not attacking
     
     # 技能使用奖励
     def calculate_skill_usage(self, main_hero, enemy_hero):
@@ -779,3 +784,25 @@ class GameRewardManager:
             reward_sum += reward_struct.value * reward_struct.weight
             reward_dict[reward_name] = reward_struct.value
         reward_dict["reward_sum"] = reward_sum
+
+    def update_reward_weights(self, frame_no):
+        # Define time thresholds for changing focus
+        early_game = 1000  # Adjust based on game duration
+        mid_game = 2000
+
+        # Clear minions focus in early game
+        if frame_no <= early_game:
+            self.m_cur_calc_frame_map["last_hit"].weight = 1.0
+            self.m_cur_calc_frame_map["attack_enemy_hero"].weight = 0.1
+            self.m_cur_calc_frame_map["attack_enemy_tower"].weight = 0.5
+        # Shift focus to attacking hero and towers in mid game
+        elif early_game < frame_no <= mid_game:
+            self.m_cur_calc_frame_map["last_hit"].weight = 0.5
+            self.m_cur_calc_frame_map["attack_enemy_hero"].weight = 0.5
+            self.m_cur_calc_frame_map["attack_enemy_tower"].weight = 1.0
+        # Late game focus on pushing towers and crystals
+        else:
+            self.m_cur_calc_frame_map["last_hit"].weight = 0.1
+            self.m_cur_calc_frame_map["attack_enemy_hero"].weight = 1.0
+            self.m_cur_calc_frame_map["attack_enemy_tower"].weight = 2.0
+
