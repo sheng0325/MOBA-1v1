@@ -304,36 +304,38 @@ class GameRewardManager:
 
         if self.is_in_enemy_tower_range(main_hero, enemy_tower):
             # 在敌方防御塔范围内，不鼓励攻击敌方英雄，给予惩罚
-            reward += -1.0
+            reward += -2.0  # 增加惩罚力度
         else:
             if hp_diff_percentage >= 0.1:
-                # 优势范围：主动进攻敌方英雄，奖励 +5
-                reward += 5.0
-            elif -0.1 <= hp_diff_percentage < 0.1:
-                # 对峙范围：保持对峙，奖励 +2
-                reward += 2.0
-            else:
-                # 劣势范围：撤退或防御，奖励 +1
+                # 优势范围：主动进攻敌方英雄，奖励 +1.0
                 reward += 1.0
+            elif -0.1 <= hp_diff_percentage < 0.1:
+                # 对峙范围：保持对峙，奖励 +0.5
+                reward += 0.5
+            else:
+                # 劣势范围：撤退或防御，奖励 +0.2
+                reward += 0.2
 
         # 检查英雄的生命值
         hero_hp_percentage = main_hero["actor_state"]["hp"] / main_hero["actor_state"]["max_hp"]
         if hero_hp_percentage < 0.3:
             if self.is_near_enemy_hero(main_hero, enemy_hero):
-                reward += -0.5
+                reward += -1.0  # 增加惩罚
             if self.is_far_from_own_tower(main_hero, main_tower):
-                reward += -0.5
+                reward += -1.0  # 增加惩罚
         return reward
     
     # 攻击敌方防御塔
     def calculate_attack_enemy_tower(self, main_hero, enemy_tower):
         reward = 0.0
+        if not self.minion_positions_current:
+            return -1.0  # 没有小兵，惩罚冲塔
         if self.is_in_enemy_tower_range(main_hero, enemy_tower):
             # 检查英雄的生命值变化
             hp_decrease = self.main_hero_hp_last - main_hero["actor_state"]["hp"]
             if hp_decrease > 400:
                 # 生命值正在减少，可能被防御塔攻击，给予惩罚
-                reward = -1.0
+                reward = -2.0
             else:
                 # 生命值未减少，可能安全攻击防御塔，给予奖励
                 reward = 1.0
@@ -532,7 +534,7 @@ class GameRewardManager:
         tower_pos = (enemy_tower["location"]["x"], enemy_tower["location"]["z"])
         distance = self.calculate_distance(hero_pos, tower_pos)
         tower_attack_range = enemy_tower["attack_range"]  # 使用实际防御塔攻击范围
-        return distance < tower_attack_range
+        return distance < (tower_attack_range/2)
 
     def is_near_enemy_hero(self, main_hero, enemy_hero):
         """
@@ -784,14 +786,14 @@ class GameRewardManager:
 
     def update_reward_weights(self, frame_no):
         # Define time thresholds for changing focus
-        early_game = 1000  # Adjust based on game duration
-        mid_game = 2000
+        early_game = 1500  # Adjust based on game duration
+        mid_game = 3000
 
         # Clear minions focus in early game
         if frame_no <= early_game:
-            self.m_cur_calc_frame_map["last_hit"].weight = 1.0
-            self.m_cur_calc_frame_map["attack_enemy_hero"].weight = 0.1
-            self.m_cur_calc_frame_map["attack_enemy_tower"].weight = 0.5
+            self.m_cur_calc_frame_map["last_hit"].weight = 2.0
+            self.m_cur_calc_frame_map["attack_enemy_hero"].weight = 0.05
+            self.m_cur_calc_frame_map["attack_enemy_tower"].weight = 0.1
         # Shift focus to attacking hero and towers in mid game
         elif early_game < frame_no <= mid_game:
             self.m_cur_calc_frame_map["last_hit"].weight = 0.5
